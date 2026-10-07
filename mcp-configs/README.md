@@ -34,9 +34,9 @@ tier. When the quota is used up, the error message shows the price. To pay per c
 agent, use one of these packages:
 
 - [`tanod`](../python) (Python)
-- [`@tanod/sdk`](../typescript) (TypeScript)
+- [`@tanod-labs/sdk`](../typescript) (TypeScript)
 - [`langchain-tanod`](../langchain)
-- [`@tanod/ai-sdk`](../ai-sdk)
+- [`@tanod-labs/ai-sdk`](../ai-sdk)
 
 ## Configs
 

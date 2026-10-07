@@ -7,7 +7,7 @@ on:
       package:
         description: Workspace package to publish
         type: choice
-        options: ["@tanod/sdk", "@tanod/ai-sdk"]
+        options: ["@tanod-labs/sdk", "@tanod-labs/ai-sdk"]
 permissions:
   contents: read
   id-token: write

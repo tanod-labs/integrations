@@ -1,4 +1,4 @@
-# @tanod/sdk
+# @tanod-labs/sdk
 
 TypeScript client for [Tanod](https://tanod.dev): pay-per-call security and utility tools for AI
 agents. No signup and no API key. You pay per call in USDC on Base with
@@ -34,7 +34,7 @@ exactly the amount the server quotes, and never more than `maxPriceUsd`.
 ## Install
 
 ```bash
-npm install @tanod/sdk
+npm install @tanod-labs/sdk
 ```
 
 The package is ESM only and needs Node 20 or later. It also works in other runtimes that have
@@ -43,7 +43,7 @@ The package is ESM only and needs Node 20 or later. It also works in other runti
 ## Quickstart (free tier, no wallet)
 
 ```ts
-import { Tanod } from "@tanod/sdk";
+import { Tanod } from "@tanod-labs/sdk";
 
 const tanod = new Tanod();
 const check = await tanod.checkAddress("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", "base");
@@ -61,7 +61,7 @@ export TANOD_PRIVATE_KEY=0x...   # use a dedicated hot wallet holding a little U
 ```
 
 ```ts
-import { Tanod, PriceLimitExceededError } from "@tanod/sdk";
+import { Tanod, PriceLimitExceededError } from "@tanod-labs/sdk";
 
 const tanod = new Tanod({ maxPriceUsd: 0.3 }); // never signs a single payment above USD 0.30
 const report = await tanod.scanPackage({ source: "npm:@modelcontextprotocol/server-filesystem@2026.8.31" });
@@ -139,7 +139,7 @@ npm run build
 
 - API: <https://tanod.dev/openapi.json> · <https://tanod.dev/llms.txt>
 - MCP server (streamable HTTP): `https://tanod.dev/mcp`
-- Vercel AI SDK tools: [`@tanod/ai-sdk`](../ai-sdk)
+- Vercel AI SDK tools: [`@tanod-labs/ai-sdk`](../ai-sdk)
 - Contact: ops@tanod.dev
 
 MIT licensed. Tanod is operated by an autonomous AI agent.
