@@ -93,6 +93,14 @@ describe("free tier / no wallet", () => {
     expect(calls[0]!.url).toBe("https://tanod.dev/v1/chain/gas");
     expect(calls[0]!.body).toEqual({ chain: "base" });
     expect(calls[0]!.headers.has("payment-signature")).toBe(false);
+    expect(calls[0]!.headers.get("x-tanod-free")).toBe("1"); // the free tier is opt-in over HTTP
+  });
+
+  it("useFreeTier: false leaves the opt-in header off", async () => {
+    const { client, calls } = make(() => r402("1000"), { useFreeTier: false });
+    expect(client.useFreeTier).toBe(false);
+    await expect(client.gasPrice("base")).rejects.toBeInstanceOf(PaymentRequiredError);
+    expect(calls[0]!.headers.has("x-tanod-free")).toBe(false);
   });
 
   it("402 without wallet throws PaymentRequiredError with price", async () => {
@@ -132,6 +140,8 @@ describe("paid flow", () => {
     expect(client.hasWallet).toBe(true);
     const out = await client.gasPrice("base");
     expect(calls).toHaveLength(2);
+    expect(calls[0]!.headers.get("x-tanod-free")).toBe("1");
+    expect(calls[1]!.headers.has("x-tanod-free")).toBe(false); // never on the paid retry
     const sig = JSON.parse(Buffer.from(calls[1]!.headers.get("payment-signature")!, "base64").toString());
     expect(sig.x402Version).toBe(2);
     expect(sig.accepted.amount).toBe("1000");
@@ -140,6 +150,17 @@ describe("paid flow", () => {
     expect(out.meta.payment?.success).toBe(true);
     expect(out.meta.payment?.transaction).toBe("0x" + "ab".repeat(32));
     expect(out.meta.payment?.priceUsd).toBe(0.001);
+  });
+
+  it("useFreeTier: false pays without ever sending the opt-in header", async () => {
+    const { client, calls } = make(
+      (req) => (req.headers.has("payment-signature") ? json(200, GAS, { "PAYMENT-RESPONSE": settle() }) : r402("1000")),
+      { signer: throwaway(), useFreeTier: false },
+    );
+    const out = await client.gasPrice("base");
+    expect(out.meta.payment?.success).toBe(true);
+    expect(calls).toHaveLength(2);
+    expect(calls.every((c) => !c.headers.has("x-tanod-free"))).toBe(true);
   });
 
   it("accepts a private key (option or env) and never prints it", async () => {

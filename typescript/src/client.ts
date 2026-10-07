@@ -2,7 +2,9 @@
  * Tanod client: one method per route of https://tanod.dev, paid with x402 when needed.
  *
  * Flow per call:
- *  1. Send unpaid; the free daily tier answers 200 when it covers the call.
+ *  1. Send unpaid with `X-Tanod-Free: 1` (the free tier is opt-in over HTTP; `useFreeTier: false`
+ *     leaves it off); the free daily tier answers 200 when it covers the call. The paid retry never
+ *     carries the header.
  *  2. On 402: if the quote says the input would be refused -> InvalidRequestError (nothing signed);
  *     no wallet -> PaymentRequiredError (with price); above maxPriceUsd -> PriceLimitExceededError.
  *     Otherwise sign with the official x402 client (@x402/fetch + @x402/evm) and retry once.
@@ -32,6 +34,8 @@ export const VERSION = "0.1.0";
 export const DEFAULT_BASE_URL = "https://tanod.dev";
 export const DEFAULT_MAX_PRICE_USD = 1;
 export const ENV_PRIVATE_KEY = "TANOD_PRIVATE_KEY";
+/** Header that opts an unpaid call in to the server's free daily tier. */
+export const FREE_TIER_HEADER = "X-Tanod-Free";
 const BASE_MAINNET = "eip155:8453";
 const USDC_BASE = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"; // USDC on Base mainnet (6 decimals)
 const USDC_DECIMALS = 6;
@@ -63,6 +67,12 @@ export interface TanodOptions {
   maxRetries?: number;
   /** Give up instead of sleeping longer than this (default 30 s). */
   maxRetryWaitSeconds?: number;
+  /**
+   * Send `X-Tanod-Free: 1` on the unpaid first attempt so the free daily tier is used when it
+   * covers the call (default true). false: every paid call is paid (the unpaid attempt only
+   * fetches the 402 quote).
+   */
+  useFreeTier?: boolean;
   /** Per-request timeout (default 120 s; scans can take ~90 s). */
   timeoutMs?: number;
   /** Custom fetch (testing, proxies). Default: globalThis.fetch. */
@@ -217,6 +227,7 @@ export class Tanod {
   readonly maxPriceUsd: number | null;
   readonly maxRetries: number;
   readonly maxRetryWaitSeconds: number;
+  readonly useFreeTier: boolean;
   readonly timeoutMs: number;
   #payer?: x402Client;
   readonly #http: x402HTTPClient;
@@ -227,6 +238,7 @@ export class Tanod {
     this.maxPriceUsd = opts.maxPriceUsd === undefined ? DEFAULT_MAX_PRICE_USD : opts.maxPriceUsd;
     this.maxRetries = Math.max(0, opts.maxRetries ?? 2);
     this.maxRetryWaitSeconds = opts.maxRetryWaitSeconds ?? 30;
+    this.useFreeTier = opts.useFreeTier ?? true;
     this.timeoutMs = opts.timeoutMs ?? 120_000;
     this.#fetch = opts.fetch ?? globalThis.fetch.bind(globalThis);
     this.#payer = Tanod.#buildPayer(opts, this.maxPriceUsd);
@@ -341,7 +353,8 @@ export class Tanod {
 
   async #call<R>(route: Route): Promise<T.WithMeta<R>> {
     for (let attempt = 0; ; attempt++) {
-      let res = await this.#send(route);
+      // The free-tier opt-in goes on the unpaid attempt only, never on the paid retry.
+      let res = await this.#send(route, this.useFreeTier ? { [FREE_TIER_HEADER]: "1" } : undefined);
       let quote: Quote | undefined;
       if (res.status === 402) {
         quote = new Quote(this.#http, res, (await readBody(res)).json);

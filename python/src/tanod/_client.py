@@ -2,7 +2,9 @@
 
 Flow for every call:
 
-1. Send the request unpaid. If the free daily tier covers it, the answer is a 200.
+1. Send the request unpaid, with the header ``X-Tanod-Free: 1`` (the server's free tier is
+   opt-in over HTTP; ``use_free_tier=False`` leaves the header off, so every call is paid).
+   If the free daily tier covers it, the answer is a 200.
 2. On ``402 Payment Required``: if the 402 says the input would be refused, raise
    ``InvalidRequestError`` (nothing is signed). Without a wallet, raise
    ``PaymentRequiredError`` with the quoted price. Above ``max_price_usd``, raise
@@ -52,6 +54,7 @@ DEFAULT_MAX_PRICE_USD = 1.0
 BASE_MAINNET = "eip155:8453"
 USDC_BASE = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"  # USDC on Base mainnet (6 decimals)
 _RETRYABLE = (429, 503)
+FREE_TIER_HEADER = "X-Tanod-Free"  # opt in to the server's free tier on an unpaid call
 
 T = TypeVar("T", bound=m.TanodModel)
 
@@ -216,8 +219,10 @@ class _Base:
         max_price_usd: Optional[float],
         max_retries: int,
         max_retry_wait: float,
+        use_free_tier: bool = True,
     ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.use_free_tier = bool(use_free_tier)
         self.max_price_usd = max_price_usd
         self.max_retries = max(0, int(max_retries))
         self.max_retry_wait = max_retry_wait
@@ -230,6 +235,10 @@ class _Base:
 
     def _headers(self) -> dict[str, str]:
         return {"User-Agent": f"tanod-python/{__version__}", "Accept": "application/json, text/plain, */*"}
+
+    def _unpaid_headers(self) -> Optional[dict[str, str]]:
+        """Extra headers of the unpaid attempt: the free-tier opt-in (never sent on the paid retry)."""
+        return {FREE_TIER_HEADER: "1"} if self.use_free_tier else None
 
     def _wait_for(self, resp: httpx.Response, attempt: int) -> Optional[float]:
         """Seconds to wait before retrying, or None to stop retrying."""
@@ -264,6 +273,9 @@ class Tanod(_Base):
         use_env: read ``TANOD_PRIVATE_KEY`` when no key/signer is given (default True).
         max_retries: retries on 429/503 (never charged). Default 2.
         max_retry_wait: give up instead of sleeping longer than this many seconds.
+        use_free_tier: send ``X-Tanod-Free: 1`` on the unpaid first attempt so the free daily
+            tier is used when it covers the call (default True). False: every paid call is paid
+            (the unpaid attempt only fetches the 402 quote).
         timeout: HTTP timeout in seconds (scans can take ~90 s).
         http_client: your own ``httpx.Client`` (for proxies, testing).
 
@@ -282,11 +294,13 @@ class Tanod(_Base):
         base_url: str = DEFAULT_BASE_URL,
         max_retries: int = 2,
         max_retry_wait: float = 30.0,
+        use_free_tier: bool = True,
         timeout: float = DEFAULT_TIMEOUT,
         http_client: Optional[httpx.Client] = None,
     ) -> None:
         super().__init__(
-            base_url=base_url, max_price_usd=max_price_usd, max_retries=max_retries, max_retry_wait=max_retry_wait
+            base_url=base_url, max_price_usd=max_price_usd, max_retries=max_retries, max_retry_wait=max_retry_wait,
+            use_free_tier=use_free_tier,
         )
         self._payer = build_payment_client(
             private_key=private_key,
@@ -320,7 +334,7 @@ class Tanod(_Base):
     def _call(self, route: r.Route) -> Any:
         attempt = 0
         while True:
-            resp = self._request(route)
+            resp = self._request(route, self._unpaid_headers())
             quote: Optional[_Quote] = None
             if resp.status_code == 402:
                 quote = _Quote(resp, _json_or_none(resp))
@@ -561,11 +575,13 @@ class AsyncTanod(_Base):
         base_url: str = DEFAULT_BASE_URL,
         max_retries: int = 2,
         max_retry_wait: float = 30.0,
+        use_free_tier: bool = True,
         timeout: float = DEFAULT_TIMEOUT,
         http_client: Optional[httpx.AsyncClient] = None,
     ) -> None:
         super().__init__(
-            base_url=base_url, max_price_usd=max_price_usd, max_retries=max_retries, max_retry_wait=max_retry_wait
+            base_url=base_url, max_price_usd=max_price_usd, max_retries=max_retries, max_retry_wait=max_retry_wait,
+            use_free_tier=use_free_tier,
         )
         self._payer = build_payment_client(
             private_key=private_key,
@@ -597,7 +613,7 @@ class AsyncTanod(_Base):
     async def _call(self, route: r.Route) -> Any:
         attempt = 0
         while True:
-            resp = await self._request(route)
+            resp = await self._request(route, self._unpaid_headers())
             quote: Optional[_Quote] = None
             if resp.status_code == 402:
                 quote = _Quote(resp, _json_or_none(resp))
