@@ -75,7 +75,11 @@ appears in `toString()` or in error messages.
 
 How a call runs:
 
-1. The request goes out unpaid first, so the free tier is always used before any money.
+1. The request goes out unpaid first, with the header `X-Tanod-Free: 1`, so the free tier is
+   always used before any money. Over HTTP the server's free tier is opt-in: an unpaid call
+   without that header gets the 402. Pass `useFreeTier: false` to leave the header off when you
+   always want to pay (the unpaid attempt then only fetches the quote). The paid retry never
+   carries the header.
 2. On `402`, the client decodes the x402 v2 `PAYMENT-REQUIRED` quote. It throws without signing
    when:
    - the input would be refused (`InvalidRequestError`);

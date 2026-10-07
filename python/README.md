@@ -68,7 +68,11 @@ if report.meta.payment:          # None when the free tier covered the call
 
 How a call runs:
 
-1. The request goes out unpaid first, so the free tier is always used before any money.
+1. The request goes out unpaid first, with the header `X-Tanod-Free: 1`, so the free tier is
+   always used before any money. Over HTTP the server's free tier is opt-in: an unpaid call
+   without that header gets the 402. Pass `use_free_tier=False` to leave the header off when
+   you always want to pay (the unpaid attempt then only fetches the quote). The paid retry
+   never carries the header.
 2. On `402 Payment Required`, the client reads the x402 v2 quote. It raises without signing
    when:
    - the input would be refused (`InvalidRequestError`);
