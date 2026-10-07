@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tanod": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote@0.14.3", "https://tanod.dev/mcp"]
+    }
+  }
+}

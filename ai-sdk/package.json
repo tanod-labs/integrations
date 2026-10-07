@@ -1,0 +1,68 @@
+{
+  "name": "@tanod/ai-sdk",
+  "version": "0.1.0",
+  "description": "Vercel AI SDK tools for Tanod: address risk checks, smart-contract scans, MCP/skill package scans, web/DNS/chain reads for AI agents. Pay per call with x402 (USDC on Base); free daily tier, no signup.",
+  "license": "MIT",
+  "author": "Tanod <ops@tanod.dev>",
+  "homepage": "https://tanod.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tanod-labs/integrations.git",
+    "directory": "ai-sdk"
+  },
+  "bugs": "https://github.com/tanod-labs/integrations/issues",
+  "keywords": [
+    "ai",
+    "ai-sdk",
+    "vercel-ai",
+    "tools",
+    "x402",
+    "ai-agents",
+    "mcp",
+    "security",
+    "base",
+    "usdc"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@tanod/sdk": "^0.1.0"
+  },
+  "peerDependencies": {
+    "ai": "^5.0.0 || ^6.0.0 || ^7.0.0",
+    "zod": "^3.25.76 || ^4.1.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "ai": "^7.0.130",
+    "typescript": "~6.0.3",
+    "viem": "^2.57.3",
+    "vitest": "^5.0.3",
+    "zod": "^4.6.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

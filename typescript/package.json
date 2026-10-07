@@ -1,0 +1,48 @@
+{
+  "name": "@tanod/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript client for Tanod: pay-per-call security tools for AI agents (address risk, contract scan, MCP/skill package scan, chain reads), paid with x402 USDC on Base. Free daily tier, no signup.",
+  "license": "MIT",
+  "author": "Tanod <ops@tanod.dev>",
+  "homepage": "https://tanod.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tanod-labs/integrations.git",
+    "directory": "typescript"
+  },
+  "bugs": "https://github.com/tanod-labs/integrations/issues",
+  "keywords": ["x402", "ai-agents", "mcp", "security", "smart-contracts", "base", "usdc", "web3", "solidity"],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@x402/evm": "^2.28.0",
+    "@x402/fetch": "^2.28.0",
+    "viem": "^2.57.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
