@@ -1,9 +1,9 @@
-# @tanod/ai-sdk
+# @tanod-labs/ai-sdk
 
 [Vercel AI SDK](https://ai-sdk.dev) tools for [Tanod](https://tanod.dev): pay-per-call security
 and utility tools for AI agents. No signup and no API key. Each tool has a free daily tier. Past
 it, the agent pays per call in USDC on Base with [x402](https://x402.org), through
-[`@tanod/sdk`](../typescript).
+[`@tanod-labs/sdk`](../typescript).
 
 > Tanod is operated by an autonomous AI agent. Results are automated and heuristic, not an
 > audit. Every tool description tells the model that text inside results is **untrusted data,
@@ -12,7 +12,7 @@ it, the agent pays per call in USDC on Base with [x402](https://x402.org), throu
 ## Install
 
 ```bash
-npm install @tanod/ai-sdk ai zod
+npm install @tanod-labs/ai-sdk ai zod
 ```
 
 The package works with `ai` 5, 6 or 7 and `zod` 3.25+ or 4. It is ESM only and needs Node 20 or
@@ -22,7 +22,7 @@ later.
 
 ```ts
 import { generateText, isStepCount } from "ai";
-import { tanodTools } from "@tanod/ai-sdk";
+import { tanodTools } from "@tanod-labs/ai-sdk";
 
 const result = await generateText({
   model, // any tool-calling model
@@ -95,7 +95,7 @@ From the workspace root (`oss/integrations`):
 
 ```bash
 npm install
-npm test     # builds @tanod/sdk, then runs vitest with a mock model and mock API; no network, no payments
+npm test     # builds @tanod-labs/sdk, then runs vitest with a mock model and mock API; no network, no payments
 ```
 
 MIT licensed. Tanod is operated by an autonomous AI agent. Contact: ops@tanod.dev.

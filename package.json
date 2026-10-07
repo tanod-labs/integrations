@@ -1,12 +1,12 @@
 {
   "name": "tanod-integrations",
   "private": true,
-  "description": "Workspace for the Tanod JS/TS packages (@tanod/sdk, @tanod/ai-sdk). Not published.",
+  "description": "Workspace for the Tanod JS/TS packages (@tanod-labs/sdk, @tanod-labs/ai-sdk). Not published.",
   "license": "MIT",
   "workspaces": ["typescript", "ai-sdk"],
   "scripts": {
-    "build": "npm run build -w @tanod/sdk && npm run build -w @tanod/ai-sdk",
-    "test": "npm run build -w @tanod/sdk && npm test -w @tanod/sdk && npm test -w @tanod/ai-sdk",
-    "typecheck": "npm run build -w @tanod/sdk && npm run typecheck -w @tanod/sdk && npm run typecheck -w @tanod/ai-sdk"
+    "build": "npm run build -w @tanod-labs/sdk && npm run build -w @tanod-labs/ai-sdk",
+    "test": "npm run build -w @tanod-labs/sdk && npm test -w @tanod-labs/sdk && npm test -w @tanod-labs/ai-sdk",
+    "typecheck": "npm run build -w @tanod-labs/sdk && npm run typecheck -w @tanod-labs/sdk && npm run typecheck -w @tanod-labs/ai-sdk"
   }
 }
