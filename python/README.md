@@ -10,9 +10,13 @@ agents. No signup and no API key. You pay per call in USDC on Base with
 | **pactlint**: Solidity static analysis | `scan_contract_source`, `scan_contract_address` | 0.25 (≤3k nSLOC), 0.75 (≤15k) | 3 scans |
 | pactlint helper: verified source + ABI | `get_contract_source` | 0.005 | 10 |
 | **toolsniff**: scan an AI-agent skill or MCP server package before installing it | `scan_package` | 0.02 (0.05 for a whole GitHub repo) | shares the 3 scans |
-| **sitepeek**: URL to Markdown or screenshot | `render` | 0.005 static, 0.01 JS/screenshot | 5 static |
-| **dnspeek**: DNS, email auth and TLS | `inspect_domain` | 0.01 (0.004 for one section) | 5 |
-| **chainpeek**: ENS, calldata, token, balance, gas, block | `resolve_ens`, `decode_calldata`, `token_info`, `balance`, `gas_price`, `latest_block` | 0.001 to 0.003 | 10 (shared) |
+| **sitepeek**: URL to Markdown or screenshot | `render` | 0.005 static, 0.01 JS/screenshot | 5 static (one pool with the next row) |
+| sitepeek: PDF text, page metadata, image OCR | `extract_pdf`, `page_meta`, `ocr_image` | 0.005 / 0.002 / 0.01 | shares the 5 |
+| **dnspeek**: DNS, email auth and TLS | `inspect_domain` | 0.01 (0.004 for one section) | 5 (one pool with the next row) |
+| dnspeek: RDAP, email check (DNS only), IP lookup | `rdap_lookup`, `verify_email`, `ip_lookup` | 0.002 / 0.002 / 0.001 | shares the 5 |
+| **chainpeek**: ENS, calldata, token, balance, gas, block, Chainlink price, transaction, NFT, allowance, portfolio, swap quote | `resolve_ens`, `decode_calldata`, `token_info`, `balance`, `gas_price`, `latest_block`, `token_price`, `transaction`, `nft`, `allowance`, `portfolio`, `swap_quote` | 0.001 to 0.004 (portfolio 0.004; `swap_quote` is a spot quote, not a firm price) | 10 (shared) |
+| **findpeek**: web search | `web_search` | 0.012 | 3 |
+| **weatherpeek**: hourly forecast (MET Norway, CC BY 4.0) | `weather` | 0.002 | 5 |
 | **agentscan**: index of x402 endpoints and MCP servers | `agents_summary` (free), `agents_query`, `agents_history`, `agents_export`, `agents_bulk` | free / 0.02 / 0.05 / 0.25 / 2.00 | unlimited / 10 / 5 / none / none |
 | Stored reports, health | `get_report`, `health` | free | n/a |
 

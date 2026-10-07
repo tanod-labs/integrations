@@ -296,6 +296,23 @@ describe("request shapes", () => {
     ["balance", (c) => c.balance("base", A, B), "POST", "/v1/chain/balance", { chain: "base", address: A, token: B }],
     ["gasPrice", (c) => c.gasPrice("ethereum"), "POST", "/v1/chain/gas", { chain: "ethereum" }],
     ["latestBlock", (c) => c.latestBlock("base"), "POST", "/v1/chain/block", { chain: "base" }],
+    ["extractPdf", (c) => c.extractPdf("https://x.example/a.pdf", { maxPages: 5 }), "POST", "/v1/pdf", { url: "https://x.example/a.pdf", max_pages: 5 }],
+    ["extractPdf default", (c) => c.extractPdf("https://x.example/a.pdf"), "POST", "/v1/pdf", { url: "https://x.example/a.pdf" }],
+    ["pageMeta", (c) => c.pageMeta("https://github.com/"), "POST", "/v1/meta", { url: "https://github.com/" }],
+    ["ocrImage", (c) => c.ocrImage("https://x.example/a.png", "eng"), "POST", "/v1/ocr", { url: "https://x.example/a.png", lang: "eng" }],
+    ["rdapLookup", (c) => c.rdapLookup("example.com"), "POST", "/v1/rdap", { query: "example.com" }],
+    ["verifyEmail", (c) => c.verifyEmail("a@example.com"), "POST", "/v1/email/verify", { email: "a@example.com" }],
+    ["ipLookup", (c) => c.ipLookup("1.1.1.1"), "POST", "/v1/ip", { ip: "1.1.1.1" }],
+    ["tokenPrice", (c) => c.tokenPrice("base", "ETH/USD"), "POST", "/v1/chain/price", { chain: "base", pair: "ETH/USD" }],
+    ["transaction", (c) => c.transaction("base", "0x" + "c".repeat(64)), "POST", "/v1/chain/tx", { chain: "base", hash: "0x" + "c".repeat(64) }],
+    ["nft", (c) => c.nft("ethereum", A, "1"), "POST", "/v1/chain/nft", { chain: "ethereum", contract: A, token_id: "1" }],
+    ["allowance", (c) => c.allowance("base", A, B, A), "POST", "/v1/chain/allowance", { chain: "base", token: A, owner: B, spender: A }],
+    ["portfolio", (c) => c.portfolio("base", A, [B]), "POST", "/v1/chain/portfolio", { chain: "base", address: A, tokens: [B] }],
+    ["swapQuote", (c) => c.swapQuote("base", { tokenIn: A, tokenOut: B, amountIn: "1" }), "POST", "/v1/chain/quote", { chain: "base", token_in: A, token_out: B, amount_in: "1" }],
+    ["swapQuote raw", (c) => c.swapQuote("base", { tokenIn: A, tokenOut: B, amountInRaw: "1000000" }), "POST", "/v1/chain/quote", { chain: "base", token_in: A, token_out: B, amount_in_raw: "1000000" }],
+    ["webSearch", (c) => c.webSearch("x402", { count: 3, freshness: "week" }), "POST", "/v1/search", { query: "x402", count: 3, freshness: "week" }],
+    ["weather coords", (c) => c.weather({ lat: 59.9, lon: 10.7, hours: 12 }), "POST", "/v1/weather", { lat: 59.9, lon: 10.7, hours: 12 }],
+    ["weather place", (c) => c.weather({ place: "Oslo, NO" }), "POST", "/v1/weather", { place: "Oslo, NO" }],
     ["agentsSummary", (c) => c.agentsSummary(), "GET", "/v1/agents/summary", undefined],
     ["agentsQuery", (c) => c.agentsQuery({ network: "base", q: "weather", page_size: 10 }), "POST", "/v1/agents/query", { network: "base", q: "weather", page_size: 10 }],
     ["agentsHistory", (c) => c.agentsHistory({ url: "https://x.example/api" }), "POST", "/v1/agents/history", { url: "https://x.example/api" }],
@@ -343,3 +360,48 @@ describe("fail-closed quote validation", () => {
   });
 });
 
+describe("new-route input validation (nothing is sent)", () => {
+  const bad: [string, (c: Tanod) => Promise<unknown>][] = [
+    ["maxPages 0", (c) => c.extractPdf("https://x.example/a.pdf", { maxPages: 0 })],
+    ["maxPages 201", (c) => c.extractPdf("https://x.example/a.pdf", { maxPages: 201 })],
+    ["bad pair", (c) => c.tokenPrice("base", "FOO/USD" as never)],
+    ["bad tx hash", (c) => c.transaction("base", "0x12")],
+    ["bad nft contract", (c) => c.nft("base", "0x12", "1")],
+    ["empty token id", (c) => c.nft("base", A, "")],
+    ["bad allowance spender", (c) => c.allowance("base", A, B, "nope")],
+    ["too many portfolio tokens", (c) => c.portfolio("base", A, Array(21).fill(A))],
+    ["quote both amounts", (c) => c.swapQuote("base", { tokenIn: A, tokenOut: B, amountIn: "1", amountInRaw: "1" })],
+    ["quote no amount", (c) => c.swapQuote("base", { tokenIn: A, tokenOut: B })],
+    ["search count 11", (c) => c.webSearch("x", { count: 11 })],
+    ["search freshness", (c) => c.webSearch("x", { freshness: "decade" as never })],
+    ["weather lat only", (c) => c.weather({ lat: 1 })],
+    ["weather both forms", (c) => c.weather({ lat: 1, lon: 2, place: "Oslo" })],
+    ["weather none", (c) => c.weather({})],
+    ["weather hours 49", (c) => c.weather({ place: "Oslo", hours: 49 })],
+    ["weather lat range", (c) => c.weather({ lat: 91, lon: 0 })],
+  ];
+  it.each(bad)("%s", async (_n, call) => {
+    const { client, calls } = make(() => json(200, {}));
+    await expect(call(client)).rejects.toBeInstanceOf(InvalidRequestError);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("new routes keep the safety path", () => {
+  it("a quote for a non-USDC asset is refused before signing", async () => {
+    const pr = paymentRequired("2000");
+    pr.accepts[0]!.asset = "0x" + "9".repeat(40);
+    const { client, calls } = make(() => json(402, pr, { "PAYMENT-REQUIRED": b64(pr) }), { signer: privateKeyToAccount(generatePrivateKey()) });
+    await expect(client.weather({ place: "Oslo" })).rejects.toBeInstanceOf(TanodError);
+    expect(calls).toHaveLength(1);
+  });
+  it("sends the free-tier header on the first attempt only", async () => {
+    const { client, calls } = make((_r, n) => (n === 1 ? r402("4000") : json(200, { ok: 1 }, { "PAYMENT-RESPONSE": settle("4000") })), {
+      signer: privateKeyToAccount(generatePrivateKey()),
+    });
+    const out = await client.portfolio("base", A);
+    expect(out.meta.payment?.priceUsd).toBe(0.004);
+    expect(calls[0]!.headers.get("x-tanod-free")).toBe("1");
+    expect(calls[1]!.headers.has("x-tanod-free")).toBe(false);
+  });
+});

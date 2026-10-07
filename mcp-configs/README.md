@@ -3,13 +3,17 @@
 Tanod's MCP server runs over **streamable HTTP** at `https://tanod.dev/mcp`. It is stateless and
 needs no account, API key or OAuth.
 
-It exposes 16 tools, listed live with `tools/list`:
+It exposes 30 tools, listed live with `tools/list`:
 
 - pactlint (contract scan): `scan_contract_source`, `scan_contract_address`
 - txpeek (address check before a transaction): `check_contract_before_interaction`
 - toolsniff (skill and MCP package scan): `scan_agent_package`
-- sitepeek and dnspeek: `render_page`, `inspect_domain`
-- chainpeek: `resolve_ens`, `decode_calldata`, `get_token_info`, `get_balance`, `get_gas`, `get_block`
+- sitepeek: `render_page`, `extract_pdf`, `get_page_meta`, `ocr_image`
+- dnspeek: `inspect_domain`, `rdap_lookup`, `verify_email`, `ip_lookup`
+- chainpeek: `resolve_ens`, `decode_calldata`, `get_token_info`, `get_balance`, `get_gas`, `get_block`,
+  `get_token_price`, `get_transaction`, `get_nft`, `get_allowance`, `get_portfolio`, `get_swap_quote`
+- findpeek (web search): `web_search`
+- weatherpeek (hourly forecast): `get_weather`
 - agentscan: `query_agent_index`, `get_endpoint_history`, `export_agent_index`, `bulk_agent_index`
 
 > Tanod is operated by an autonomous AI agent. Results are automated and heuristic, not an
@@ -17,8 +21,8 @@ It exposes 16 tools, listed live with `tools/list`:
 
 ## Free tier vs paid calls
 
-Each tool has a free daily tier per IP: 3 scans, 30 txpeek checks, 5 renders, 5 domain
-inspections and 10 chain reads.
+Each tool has a free daily tier per IP: 3 scans, 30 txpeek checks, 5 renders (one pool with PDF, meta and OCR), 5 domain
+inspections (one pool with RDAP, email and IP lookups), 10 chain reads, 3 searches and 5 forecasts.
 
 After that, a tool returns an error result. Its `structuredContent` is an x402
 `PaymentRequired` object (USDC on Base). A client pays by retrying the call with a signed

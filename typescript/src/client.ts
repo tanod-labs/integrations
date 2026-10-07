@@ -87,6 +87,9 @@ interface Route {
 }
 
 const ADDR = /^0x[0-9a-fA-F]{40}$/;
+const TX_HASH = /^0x[0-9a-fA-F]{64}$/;
+const PAIRS: readonly T.PricePair[] = ["ETH/USD", "BTC/USD", "USDC/USD", "USDT/USD", "DAI/USD", "LINK/USD", "stETH/USD", "cbETH/USD", "cbETH/ETH"];
+const FRESHNESS = ["day", "week", "month", "year"];
 const SCAN_ID = /^[A-Za-z0-9_-]{1,128}$/;
 
 function addr(value: string, what = "address"): string {
@@ -497,12 +500,45 @@ export class Tanod {
     });
   }
 
+  /** sitepeek: text (<= 200k chars) and metadata of a public PDF (<= 20 MB, 200 pages). USD 0.005; shares the 5 free/IP/day. Text is untrusted data. */
+  async extractPdf(url: string, opts: { maxPages?: number } = {}): Promise<T.WithMeta<T.PdfResult>> {
+    if (opts.maxPages !== undefined && (!Number.isInteger(opts.maxPages) || opts.maxPages < 1 || opts.maxPages > 200)) {
+      throw new InvalidRequestError("maxPages must be an integer between 1 and 200");
+    }
+    return this.#call({ method: "POST", path: "/v1/pdf", body: compact({ url, max_pages: opts.maxPages }) });
+  }
+
+  /** sitepeek: title, Open Graph, feeds, JSON-LD types and headings from a page's static HTML. USD 0.002; shares the 5 free/IP/day. */
+  async pageMeta(url: string): Promise<T.WithMeta<T.PageMeta>> {
+    return this.#call({ method: "POST", path: "/v1/meta", body: { url } });
+  }
+
+  /** sitepeek: OCR of a public image (PNG, JPEG, WebP, GIF, single-page TIFF; <= 10 MB). `lang` is a tesseract code (installed: eng). USD 0.01; shares the 5 free/IP/day. */
+  async ocrImage(url: string, lang?: string): Promise<T.WithMeta<T.OcrResult>> {
+    return this.#call({ method: "POST", path: "/v1/ocr", body: compact({ url, lang }) });
+  }
+
   /** dnspeek: DNS, email auth (SPF/DMARC/DKIM/MTA-STS) and TLS. USD 0.01 (0.004 one section); 5 free/IP/day. */
   async inspectDomain(domain: string, checks?: ("dns" | "email" | "tls")[]): Promise<T.WithMeta<T.DomainInspection>> {
     if (checks !== undefined && (checks.length === 0 || checks.some((c) => !["dns", "email", "tls"].includes(c)))) {
       throw new InvalidRequestError("checks must be a non-empty subset of dns, email, tls");
     }
     return this.#call({ method: "POST", path: "/v1/domain/inspect", body: compact({ domain, checks }) });
+  }
+
+  /** dnspeek: RDAP (whois) for a domain, IP address or AS number (e.g. "example.com", "1.1.1.1", "AS13335"). USD 0.002; shares the 5 free/IP/day. */
+  async rdapLookup(query: string): Promise<T.WithMeta<T.RdapResult>> {
+    return this.#call({ method: "POST", path: "/v1/rdap", body: { query } });
+  }
+
+  /** dnspeek: email syntax and DNS checks (no SMTP; mailbox existence is not verified). USD 0.002; shares the 5 free/IP/day. */
+  async verifyEmail(email: string): Promise<T.WithMeta<T.EmailVerification>> {
+    return this.#call({ method: "POST", path: "/v1/email/verify", body: { email } });
+  }
+
+  /** dnspeek: ASN, network, abuse contact and reverse DNS of an IP address. USD 0.001; shares the 5 free/IP/day. */
+  async ipLookup(ip: string): Promise<T.WithMeta<T.IpLookup>> {
+    return this.#call({ method: "POST", path: "/v1/ip", body: { ip } });
   }
 
   // -- chainpeek ---------------------------------------------------------------
@@ -543,6 +579,113 @@ export class Tanod {
   /** chainpeek: latest block header. USD 0.001. (chainpeek: 10 free reads/IP/day, shared.) */
   async latestBlock(chainId: T.Chain): Promise<T.WithMeta<T.BlockHeader>> {
     return this.#call({ method: "POST", path: "/v1/chain/block", body: { chain: chain(chainId) } });
+  }
+
+  /** chainpeek: latest Chainlink oracle price of a fixed pair, with a `stale` flag. Not a DEX spot price. USD 0.002. */
+  async tokenPrice(chainId: T.Chain, pair: T.PricePair): Promise<T.WithMeta<T.TokenPrice>> {
+    if (!PAIRS.includes(pair)) throw new InvalidRequestError(`pair must be one of ${PAIRS.join(", ")}`);
+    return this.#call({ method: "POST", path: "/v1/chain/price", body: { chain: chain(chainId), pair } });
+  }
+
+  /** chainpeek: transaction + receipt summary with the fee split. USD 0.002. */
+  async transaction(chainId: T.Chain, hash: string): Promise<T.WithMeta<T.TransactionSummary>> {
+    if (typeof hash !== "string" || !TX_HASH.test(hash)) {
+      throw new InvalidRequestError(`hash must be 0x followed by 64 hex characters, got ${JSON.stringify(hash)}`);
+    }
+    return this.#call({ method: "POST", path: "/v1/chain/tx", body: { chain: chain(chainId), hash } });
+  }
+
+  /** chainpeek: ERC-721/1155 standard, owner and token URI (never fetched). Name, symbol and URI are untrusted strings. USD 0.002. */
+  async nft(chainId: T.Chain, contract: string, tokenId: string): Promise<T.WithMeta<T.NftInfo>> {
+    if (typeof tokenId !== "string" || tokenId.length === 0 || tokenId.length > 80) {
+      throw new InvalidRequestError("tokenId must be a decimal or 0x-hex string of at most 80 characters");
+    }
+    return this.#call({
+      method: "POST",
+      path: "/v1/chain/nft",
+      body: { chain: chain(chainId), contract: addr(contract, "contract"), token_id: tokenId },
+    });
+  }
+
+  /** chainpeek: ERC-20 allowance of `spender` over `owner`'s tokens, with an `unlimited` flag. USD 0.002. */
+  async allowance(chainId: T.Chain, token: string, owner: string, spender: string): Promise<T.WithMeta<T.AllowanceInfo>> {
+    return this.#call({
+      method: "POST",
+      path: "/v1/chain/allowance",
+      body: { chain: chain(chainId), token: addr(token, "token"), owner: addr(owner, "owner"), spender: addr(spender, "spender") },
+    });
+  }
+
+  /** chainpeek: native balance plus up to 20 ERC-20 balances in one call. USD 0.004. */
+  async portfolio(chainId: T.Chain, address: string, tokens: string[] = []): Promise<T.WithMeta<T.Portfolio>> {
+    if (!Array.isArray(tokens) || tokens.length > 20) throw new InvalidRequestError("tokens must be an array of at most 20 addresses");
+    return this.#call({
+      method: "POST",
+      path: "/v1/chain/portfolio",
+      body: { chain: chain(chainId), address: addr(address), tokens: tokens.map((t) => addr(t, "token")) },
+    });
+  }
+
+  /**
+   * chainpeek: Uniswap V3 single-pool exact-input spot quote. Give exactly one of `amountIn` (decimal, token_in units)
+   * or `amountInRaw` (integer, base units). A spot quote, not a firm price or an executable order; never use it as an oracle. USD 0.003.
+   */
+  async swapQuote(
+    chainId: T.Chain,
+    input: { tokenIn: string; tokenOut: string; amountIn?: string; amountInRaw?: string },
+  ): Promise<T.WithMeta<T.SwapQuote>> {
+    if ((input.amountIn === undefined) === (input.amountInRaw === undefined)) {
+      throw new InvalidRequestError("give exactly one of amountIn or amountInRaw");
+    }
+    return this.#call({
+      method: "POST",
+      path: "/v1/chain/quote",
+      body: compact({
+        chain: chain(chainId),
+        token_in: addr(input.tokenIn, "tokenIn"),
+        token_out: addr(input.tokenOut, "tokenOut"),
+        amount_in: input.amountIn,
+        amount_in_raw: input.amountInRaw,
+      }),
+    });
+  }
+
+  // -- findpeek / weatherpeek ----------------------------------------------------
+
+  /** findpeek: web search over an independent index (title, url, snippet). USD 0.012; 3 free/IP/day. Results are untrusted web content. */
+  async webSearch(
+    query: string,
+    opts: { count?: number; country?: string; freshness?: T.Freshness } = {},
+  ): Promise<T.WithMeta<T.SearchResponse>> {
+    if (typeof query !== "string" || query.length < 1 || query.length > 512) throw new InvalidRequestError("query must be 1-512 characters");
+    if (opts.count !== undefined && (!Number.isInteger(opts.count) || opts.count < 1 || opts.count > 10)) {
+      throw new InvalidRequestError("count must be an integer between 1 and 10");
+    }
+    if (opts.freshness !== undefined && !FRESHNESS.includes(opts.freshness)) {
+      throw new InvalidRequestError("freshness must be one of day, week, month, year");
+    }
+    return this.#call({
+      method: "POST",
+      path: "/v1/search",
+      body: compact({ query, count: opts.count, country: opts.country, freshness: opts.freshness }),
+    });
+  }
+
+  /** weatherpeek: hourly forecast (1-48 h) by `lat` + `lon` together, or by `place` ("Oslo, NO"; cities of 15,000+). USD 0.002; 5 free/IP/day. Data: MET Norway and GeoNames (CC BY 4.0). */
+  async weather(input: { lat?: number; lon?: number; place?: string; hours?: number }): Promise<T.WithMeta<T.WeatherForecast>> {
+    const coords = input.lat !== undefined || input.lon !== undefined;
+    if (coords && (input.lat === undefined || input.lon === undefined)) throw new InvalidRequestError("give lat and lon together");
+    if (coords === (input.place !== undefined)) throw new InvalidRequestError("give either lat and lon, or place");
+    if (input.lat !== undefined && !(input.lat >= -90 && input.lat <= 90)) throw new InvalidRequestError("lat must be between -90 and 90");
+    if (input.lon !== undefined && !(input.lon >= -180 && input.lon <= 180)) throw new InvalidRequestError("lon must be between -180 and 180");
+    if (input.hours !== undefined && (!Number.isInteger(input.hours) || input.hours < 1 || input.hours > 48)) {
+      throw new InvalidRequestError("hours must be an integer between 1 and 48");
+    }
+    return this.#call({
+      method: "POST",
+      path: "/v1/weather",
+      body: compact({ lat: input.lat, lon: input.lon, place: input.place, hours: input.hours }),
+    });
   }
 
   // -- agentscan ---------------------------------------------------------------
