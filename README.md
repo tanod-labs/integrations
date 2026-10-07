@@ -12,9 +12,9 @@ licensed.
 | Package | Path | Registry name | What it is |
 |---|---|---|---|
 | Python SDK | [`python/`](python) | PyPI `tanod` | Typed sync and async client, one method per route. It handles x402 with the official [`x402`](https://pypi.org/project/x402/) package. Payments need the `tanod[wallet]` extra. |
-| TypeScript SDK | [`typescript/`](typescript) | npm `@tanod/sdk` | The same surface, built on the official [`@x402/fetch`](https://www.npmjs.com/package/@x402/fetch) and [`@x402/evm`](https://www.npmjs.com/package/@x402/evm) packages (2.28.x). |
+| TypeScript SDK | [`typescript/`](typescript) | npm `@tanod-labs/sdk` | The same surface, built on the official [`@x402/fetch`](https://www.npmjs.com/package/@x402/fetch) and [`@x402/evm`](https://www.npmjs.com/package/@x402/evm) packages (2.28.x). |
 | LangChain tools | [`langchain/`](langchain) | PyPI `langchain-tanod` | `StructuredTool` per route, plus `TanodToolkit` and `get_tanod_tools()`. |
-| Vercel AI SDK tools | [`ai-sdk/`](ai-sdk) | npm `@tanod/ai-sdk` | `tool()` definitions with zod schemas. Works with `ai` 5, 6 and 7. |
+| Vercel AI SDK tools | [`ai-sdk/`](ai-sdk) | npm `@tanod-labs/ai-sdk` | `tool()` definitions with zod schemas. Works with `ai` 5, 6 and 7. |
 | MCP client configs | [`mcp-configs/`](mcp-configs) | none | Configs for Claude Code, Claude Desktop, Cursor, Windsurf, VS Code and a generic client, all pointing at `https://tanod.dev/mcp`. |
 | n8n design note | [`n8n/DESIGN.md`](n8n/DESIGN.md) | none | Plan for a community node. Not built yet. |
 
@@ -53,7 +53,7 @@ Signatures come from random, unfunded throwaway keys.
 |---|---|---|
 | Python SDK | `pip install -e "./python[dev]" && pytest -q python/tests` | **88 passed** |
 | LangChain | `pip install -e "./langchain[dev]" && pytest -q langchain/tests` | **40 passed** |
-| TypeScript SDK | `npm ci && npm test` (builds `@tanod/sdk`, then runs vitest) | **85 passed** |
+| TypeScript SDK | `npm ci && npm test` (builds `@tanod-labs/sdk`, then runs vitest) | **85 passed** |
 | AI SDK tools | included in `npm test`; includes an end-to-end `generateText` run with `MockLanguageModelV4` | **35 passed** |
 | Typecheck | `npm run typecheck` | clean |
 | Packaging | `python -m build` + `twine check` (both PyPI packages); `npm pack --dry-run` (both npm packages) | passed |
@@ -127,7 +127,7 @@ python -m build python --outdir dist-py && python -m build langchain --outdir di
 twine check dist-py/* && twine upload dist-py/tanod-* && twine upload dist-py/langchain_tanod-*
 ```
 
-### 2. npm (`@tanod/sdk` first, then `@tanod/ai-sdk`)
+### 2. npm (`@tanod-labs/sdk` first, then `@tanod-labs/ai-sdk`)
 
 1. Create the npm **org `tanod`**. It owns the `@tanod` scope; the name was unclaimed on
    2026-10-07. If the org cannot be had, rename to `tanod-sdk` and `tanod-ai-sdk` in both
@@ -135,9 +135,9 @@ twine check dist-py/* && twine upload dist-py/tanod-* && twine upload dist-py/la
 2. Under each package's settings on npmjs.com, add a trusted publisher: GitHub Actions, org
    `tanod-labs`, repo `integrations`, workflow `publish-npm.yml`. A package that does not exist
    yet can be bootstrapped with one manual
-   `npm publish -w @tanod/sdk --access public` using a granular token, then switched to trusted
+   `npm publish -w @tanod-labs/sdk --access public` using a granular token, then switched to trusted
    publishing.
-3. In GitHub, go to Actions → **publish-npm** → Run with `@tanod/sdk`, then with `@tanod/ai-sdk`.
+3. In GitHub, go to Actions → **publish-npm** → Run with `@tanod-labs/sdk`, then with `@tanod-labs/ai-sdk`.
    The workflow publishes with `--provenance`.
 
 ### 3. After publishing

@@ -1,5 +1,5 @@
 {
-  "name": "@tanod/ai-sdk",
+  "name": "@tanod-labs/ai-sdk",
   "version": "0.1.0",
   "description": "Vercel AI SDK tools for Tanod: address risk checks, smart-contract scans, MCP/skill package scans, web/DNS/chain reads for AI agents. Pay per call with x402 (USDC on Base); free daily tier, no signup.",
   "license": "MIT",
@@ -48,7 +48,7 @@
     "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
-    "@tanod/sdk": "^0.1.0"
+    "@tanod-labs/sdk": "^0.1.0"
   },
   "peerDependencies": {
     "ai": "^5.0.0 || ^6.0.0 || ^7.0.0",
