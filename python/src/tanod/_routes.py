@@ -16,6 +16,10 @@ from ._errors import InvalidRequestError
 
 _ADDR = re.compile(r"^0x[0-9a-fA-F]{40}$")
 _CHAINS = ("ethereum", "base")
+_TX_HASH = re.compile(r"^0x[0-9a-fA-F]{64}$")
+_OCR_LANG = re.compile(r"^[a-z][a-z_]{1,15}(\+[a-z][a-z_]{1,15}){0,2}$")
+_PAIRS = ("ETH/USD", "BTC/USD", "USDC/USD", "USDT/USD", "DAI/USD", "LINK/USD", "stETH/USD", "cbETH/USD", "cbETH/ETH")
+_FRESHNESS = ("day", "week", "month", "year")
 
 
 @dataclass(frozen=True)
@@ -154,6 +158,40 @@ def inspect_domain(domain: str, checks: Optional[Sequence[str]]) -> Route:
     return Route("POST", "/v1/domain/inspect", m.DomainInspection, body)
 
 
+def extract_pdf(url: str, max_pages: Optional[int]) -> Route:
+    if max_pages is not None and not 1 <= max_pages <= 200:
+        raise InvalidRequestError("max_pages must be between 1 and 200")
+    return Route("POST", "/v1/pdf", m.PdfResult, _drop_none({"url": url, "max_pages": max_pages}))
+
+
+def page_meta(url: str) -> Route:
+    return Route("POST", "/v1/meta", m.PageMeta, {"url": url})
+
+
+def ocr_image(url: str, lang: Optional[str]) -> Route:
+    if lang is not None and not _OCR_LANG.match(lang):
+        raise InvalidRequestError("lang must be a Tesseract language code such as 'eng' (or 'eng+deu')")
+    return Route("POST", "/v1/ocr", m.OcrResult, _drop_none({"url": url, "lang": lang}))
+
+
+def rdap_lookup(query: str) -> Route:
+    if not isinstance(query, str) or not 1 <= len(query) <= 255:
+        raise InvalidRequestError("query must be a domain, an IP address or an AS number (1-255 characters)")
+    return Route("POST", "/v1/rdap", m.RdapResult, {"query": query})
+
+
+def verify_email(email: str) -> Route:
+    if not isinstance(email, str) or not 1 <= len(email) <= 320:
+        raise InvalidRequestError("email must be 1-320 characters")
+    return Route("POST", "/v1/email/verify", m.EmailVerification, {"email": email})
+
+
+def ip_lookup(ip: str) -> Route:
+    if not isinstance(ip, str) or not 1 <= len(ip) <= 64:
+        raise InvalidRequestError("ip must be a single IPv4 or IPv6 address")
+    return Route("POST", "/v1/ip", m.IpLookup, {"ip": ip})
+
+
 # --- chainpeek ------------------------------------------------------------
 
 
@@ -193,6 +231,104 @@ def gas_price(chain: str) -> Route:
 
 def latest_block(chain: str) -> Route:
     return Route("POST", "/v1/chain/block", m.BlockHeader, {"chain": _chain(chain)})
+
+
+def token_price(chain: str, pair: str) -> Route:
+    if pair not in _PAIRS:
+        raise InvalidRequestError(f"pair must be one of {', '.join(_PAIRS)}, got {pair!r}")
+    return Route("POST", "/v1/chain/price", m.TokenPrice, {"chain": _chain(chain), "pair": pair})
+
+
+def transaction(chain: str, hash: str) -> Route:
+    if not isinstance(hash, str) or not _TX_HASH.match(hash):
+        raise InvalidRequestError(f"hash must be 0x followed by 64 hex characters, got {hash!r}")
+    return Route("POST", "/v1/chain/tx", m.Transaction, {"chain": _chain(chain), "hash": hash})
+
+
+def nft(chain: str, contract: str, token_id: str) -> Route:
+    if isinstance(token_id, int) and not isinstance(token_id, bool) and token_id >= 0:
+        token_id = str(token_id)
+    if not isinstance(token_id, str) or not 1 <= len(token_id) <= 80:
+        raise InvalidRequestError("token_id must be a uint256 as a decimal or 0x-hex string")
+    body = {"chain": _chain(chain), "contract": _addr(contract, "contract"), "token_id": token_id}
+    return Route("POST", "/v1/chain/nft", m.NftInfo, body)
+
+
+def allowance(chain: str, token: str, owner: str, spender: str) -> Route:
+    body = {
+        "chain": _chain(chain),
+        "token": _addr(token, "token"),
+        "owner": _addr(owner, "owner"),
+        "spender": _addr(spender, "spender"),
+    }
+    return Route("POST", "/v1/chain/allowance", m.Allowance, body)
+
+
+def portfolio(chain: str, address: str, tokens: Optional[Sequence[str]]) -> Route:
+    toks = None
+    if tokens is not None:
+        toks = [_addr(t, "token") for t in tokens]
+        if len(toks) > 20:
+            raise InvalidRequestError("tokens takes at most 20 addresses")
+    body = _drop_none({"chain": _chain(chain), "address": _addr(address), "tokens": toks})
+    return Route("POST", "/v1/chain/portfolio", m.Portfolio, body)
+
+
+def swap_quote(
+    chain: str,
+    token_in: str,
+    token_out: str,
+    amount_in: Optional[str],
+    amount_in_raw: Optional[str],
+) -> Route:
+    if (amount_in is None) == (amount_in_raw is None):
+        raise InvalidRequestError("give exactly one of amount_in or amount_in_raw")
+    body = _drop_none(
+        {
+            "chain": _chain(chain),
+            "token_in": _addr(token_in, "token_in"),
+            "token_out": _addr(token_out, "token_out"),
+            "amount_in": None if amount_in is None else str(amount_in),
+            "amount_in_raw": None if amount_in_raw is None else str(amount_in_raw),
+        }
+    )
+    return Route("POST", "/v1/chain/quote", m.SwapQuote, body)
+
+
+# --- findpeek / weatherpeek -----------------------------------------------
+
+
+def web_search(
+    query: str, count: Optional[int], country: Optional[str], freshness: Optional[str]
+) -> Route:
+    if not isinstance(query, str) or not 1 <= len(query) <= 512:
+        raise InvalidRequestError("query must be 1-512 characters")
+    if count is not None and not 1 <= count <= 10:
+        raise InvalidRequestError("count must be between 1 and 10")
+    if country is not None and (not isinstance(country, str) or len(country) != 2):
+        raise InvalidRequestError("country must be a two-letter ISO 3166-1 code")
+    if freshness is not None and freshness not in _FRESHNESS:
+        raise InvalidRequestError("freshness must be one of day, week, month, year")
+    body = _drop_none({"query": query, "count": count, "country": country, "freshness": freshness})
+    return Route("POST", "/v1/search", m.WebSearchResult, body)
+
+
+def weather(
+    lat: Optional[float], lon: Optional[float], place: Optional[str], hours: Optional[int]
+) -> Route:
+    coords = lat is not None or lon is not None
+    if coords == (place is not None) or (coords and (lat is None or lon is None)):
+        raise InvalidRequestError("give lat and lon together, or place alone")
+    if lat is not None and not -90 <= lat <= 90:
+        raise InvalidRequestError("lat must be between -90 and 90")
+    if lon is not None and not -180 <= lon <= 180:
+        raise InvalidRequestError("lon must be between -180 and 180")
+    if place is not None and not 1 <= len(place) <= 120:
+        raise InvalidRequestError("place must be 1-120 characters")
+    if hours is not None and not 1 <= hours <= 48:
+        raise InvalidRequestError("hours must be between 1 and 48")
+    body = _drop_none({"lat": lat, "lon": lon, "place": place, "hours": hours})
+    return Route("POST", "/v1/weather", m.WeatherForecast, body)
 
 
 # --- agentscan ------------------------------------------------------------

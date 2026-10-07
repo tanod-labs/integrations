@@ -99,6 +99,20 @@ def test_check_address_tool_output():
         ("tanod_agents_summary", {}, "/v1/agents/summary", None),
         ("tanod_agents_query", {"q": "weather"}, "/v1/agents/query", {"q": "weather", "page_size": 20}),
         ("tanod_agents_history", {"url": "https://x.example"}, "/v1/agents/history", {"url": "https://x.example"}),
+        ("tanod_extract_pdf", {"url": "https://x.example/a.pdf", "max_pages": 5}, "/v1/pdf", {"url": "https://x.example/a.pdf", "max_pages": 5}),
+        ("tanod_get_page_meta", {"url": "https://x.example"}, "/v1/meta", {"url": "https://x.example"}),
+        ("tanod_ocr_image", {"url": "https://x.example/a.png"}, "/v1/ocr", {"url": "https://x.example/a.png"}),
+        ("tanod_rdap_lookup", {"query": "example.com"}, "/v1/rdap", {"query": "example.com"}),
+        ("tanod_verify_email", {"email": "a@example.com"}, "/v1/email/verify", {"email": "a@example.com"}),
+        ("tanod_ip_lookup", {"ip": "1.1.1.1"}, "/v1/ip", {"ip": "1.1.1.1"}),
+        ("tanod_get_token_price", {"pair": "ETH/USD"}, "/v1/chain/price", {"chain": "base", "pair": "ETH/USD"}),
+        ("tanod_get_transaction", {"hash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}, "/v1/chain/tx", {"chain": "base", "hash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}),
+        ("tanod_get_nft", {"contract": A, "token_id": "1"}, "/v1/chain/nft", {"chain": "ethereum", "contract": A, "token_id": "1"}),
+        ("tanod_get_allowance", {"token": A, "owner": A, "spender": A}, "/v1/chain/allowance", {"chain": "base", "token": A, "owner": A, "spender": A}),
+        ("tanod_get_portfolio", {"address": A, "tokens": [A]}, "/v1/chain/portfolio", {"chain": "base", "address": A, "tokens": [A]}),
+        ("tanod_get_swap_quote", {"token_in": A, "token_out": A, "amount_in": "1"}, "/v1/chain/quote", {"chain": "base", "token_in": A, "token_out": A, "amount_in": "1"}),
+        ("tanod_web_search", {"query": "x402", "count": 3}, "/v1/search", {"query": "x402", "count": 3}),
+        ("tanod_get_weather", {"place": "Oslo, NO"}, "/v1/weather", {"place": "Oslo, NO"}),
         ("tanod_agents_export", {"network": "base"}, "/v1/agents/export", {"network": "base", "limit": 200, "format": "json"}),
     ],
 )
@@ -175,3 +189,21 @@ def test_toolkit():
     names = [t.name for t in TanodToolkit(client=c).get_tools()]
     assert names == DEFAULT_TOOL_NAMES
     assert [t.name for t in TanodToolkit(client=c, include=["tanod_scan_package"]).get_tools()] == ["tanod_scan_package"]
+
+
+def test_new_tools_are_opt_in_and_validated():
+    new = [
+        "tanod_extract_pdf", "tanod_get_page_meta", "tanod_ocr_image", "tanod_rdap_lookup", "tanod_verify_email",
+        "tanod_ip_lookup", "tanod_get_token_price", "tanod_get_transaction", "tanod_get_nft", "tanod_get_allowance",
+        "tanod_get_portfolio", "tanod_get_swap_quote", "tanod_web_search", "tanod_get_weather",
+    ]
+    assert all(n in TOOL_NAMES and n not in DEFAULT_TOOL_NAMES for n in new)
+    c, seen = client_with(lambda r: httpx.Response(200, json={}))
+    tools = tools_by_name(c, include=new)
+    out = tools["tanod_get_transaction"].invoke({"hash": "0x12"})
+    assert "Invalid" in out or "validation" in out.lower() or "pattern" in out.lower()
+    out = tools["tanod_get_swap_quote"].invoke({"token_in": A, "token_out": A})
+    assert out.startswith("Invalid input")
+    out = tools["tanod_get_weather"].invoke({})
+    assert out.startswith("Invalid input")
+    assert seen == []

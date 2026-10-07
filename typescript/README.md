@@ -13,8 +13,13 @@ and [`@x402/evm`](https://www.npmjs.com/package/@x402/evm).
 | pactlint helper: verified source + ABI | `getContractSource` | 0.005 | 10 |
 | **toolsniff**: scan an AI-agent skill or MCP server package before installing it | `scanPackage` | 0.02 (0.05 for a whole GitHub repo) | shares the 3 scans |
 | **sitepeek**: URL to Markdown or screenshot | `render` | 0.005 static, 0.01 JS/screenshot | 5 static |
+| sitepeek: PDF text, page metadata, image OCR | `extractPdf`, `pageMeta`, `ocrImage` | 0.005 / 0.002 / 0.01 | shares the 5 |
 | **dnspeek**: DNS, email auth and TLS | `inspectDomain` | 0.01 (0.004 for one section) | 5 |
+| dnspeek: RDAP, email check (no SMTP), IP lookup | `rdapLookup`, `verifyEmail`, `ipLookup` | 0.002 / 0.002 / 0.001 | shares the 5 |
 | **chainpeek**: ENS, calldata, token, balance, gas, block | `resolveEns`, `decodeCalldata`, `tokenInfo`, `balance`, `gasPrice`, `latestBlock` | 0.001 to 0.003 | 10 (shared) |
+| chainpeek: Chainlink price, transaction, NFT, allowance, portfolio, Uniswap V3 spot quote | `tokenPrice`, `transaction`, `nft`, `allowance`, `portfolio`, `swapQuote` | 0.002 / 0.002 / 0.002 / 0.002 / 0.004 / 0.003 | shares the 10 |
+| **findpeek**: web search | `webSearch` | 0.012 | 3 |
+| **weatherpeek**: hourly forecast | `weather` | 0.002 | 5 |
 | **agentscan**: index of x402 endpoints and MCP servers | `agentsSummary` (free), `agentsQuery`, `agentsHistory`, `agentsExport`/`agentsExportCsv`, `agentsBulk` | free / 0.02 / 0.05 / 0.25 / 2.00 | unlimited / 10 / 5 / none / none |
 | Stored reports, health | `getReport`, `getReportMarkdown`, `health` | free | n/a |
 

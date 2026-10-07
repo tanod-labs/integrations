@@ -56,6 +56,11 @@ These tools are opt-in. Request them with `include=[...]`, or pass `TOOL_NAMES` 
 - `tanod_latest_block` (0.001)
 - `tanod_agents_history` (0.05)
 - `tanod_agents_export` (0.25, no free tier)
+- `tanod_extract_pdf` (0.005), `tanod_get_page_meta` (0.002), `tanod_ocr_image` (0.01): sitepeek, sharing its 5 free calls/day
+- `tanod_rdap_lookup` (0.002), `tanod_verify_email` (0.002, DNS only, no SMTP), `tanod_ip_lookup` (0.001): dnspeek, sharing its 5 free calls/day
+- `tanod_get_token_price` (0.002, Chainlink), `tanod_get_transaction` (0.002), `tanod_get_nft` (0.002), `tanod_get_allowance` (0.002), `tanod_get_portfolio` (0.004), `tanod_get_swap_quote` (0.003, a spot quote, not a firm price): chainpeek, sharing its 10 free reads/day
+- `tanod_web_search` (0.012, 3 free/day): findpeek
+- `tanod_get_weather` (0.002, 5 free/day): weatherpeek
 
 Free tiers are per IP per UTC day. The live prices are in <https://tanod.dev/openapi.json>.
 

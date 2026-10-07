@@ -58,6 +58,11 @@ These tools are opt-in. Request them with `tanodTools({ include: [...] })`, or c
 
 - `tanod_get_contract_source`
 - `tanod_latest_block`
+- `tanod_extract_pdf`, `tanod_get_page_meta`, `tanod_ocr_image`: sitepeek PDF text, page metadata, image OCR (0.005 / 0.002 / 0.01; share the 5 free/day)
+- `tanod_rdap_lookup`, `tanod_verify_email`, `tanod_ip_lookup`: dnspeek RDAP, email check (DNS only, no SMTP), IP lookup (0.002 / 0.002 / 0.001; share the 5 free/day)
+- `tanod_get_token_price`, `tanod_get_transaction`, `tanod_get_nft`, `tanod_get_allowance`, `tanod_get_portfolio`, `tanod_get_swap_quote`: more chainpeek reads (0.002 / 0.002 / 0.002 / 0.002 / 0.004 / 0.003; share the 10 free/day). The swap quote is a spot quote, not a firm price
+- `tanod_web_search`: findpeek web search (0.012; 3 free/day)
+- `tanod_get_weather`: weatherpeek hourly forecast (0.002; 5 free/day)
 - `tanod_agents_history`
 - `tanod_agents_export` (no free tier)
 

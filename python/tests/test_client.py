@@ -240,6 +240,7 @@ def test_client_side_validation_makes_no_request():
 
 A = "0x" + "a" * 40
 B = "0x" + "b" * 40
+TX = "0x" + "c" * 64
 
 ROUTES = [
     (lambda c: c.scan_contract_source("contract C {}", include_informational=True), "POST", "/v1/scan/source",
@@ -263,6 +264,23 @@ ROUTES = [
     (lambda c: c.balance("base", A, token=B), "POST", "/v1/chain/balance", {"chain": "base", "address": A, "token": B}),
     (lambda c: c.gas_price("ethereum"), "POST", "/v1/chain/gas", {"chain": "ethereum"}),
     (lambda c: c.latest_block("base"), "POST", "/v1/chain/block", {"chain": "base"}),
+    (lambda c: c.extract_pdf("https://example.com/a.pdf", max_pages=5), "POST", "/v1/pdf", {"url": "https://example.com/a.pdf", "max_pages": 5}),
+    (lambda c: c.page_meta("https://example.com"), "POST", "/v1/meta", {"url": "https://example.com"}),
+    (lambda c: c.ocr_image("https://example.com/a.png", lang="eng"), "POST", "/v1/ocr", {"url": "https://example.com/a.png", "lang": "eng"}),
+    (lambda c: c.rdap_lookup("example.com"), "POST", "/v1/rdap", {"query": "example.com"}),
+    (lambda c: c.verify_email("a@example.com"), "POST", "/v1/email/verify", {"email": "a@example.com"}),
+    (lambda c: c.ip_lookup("1.1.1.1"), "POST", "/v1/ip", {"ip": "1.1.1.1"}),
+    (lambda c: c.token_price("base", "ETH/USD"), "POST", "/v1/chain/price", {"chain": "base", "pair": "ETH/USD"}),
+    (lambda c: c.transaction("base", TX), "POST", "/v1/chain/tx", {"chain": "base", "hash": TX}),
+    (lambda c: c.nft("ethereum", A, "1"), "POST", "/v1/chain/nft", {"chain": "ethereum", "contract": A, "token_id": "1"}),
+    (lambda c: c.allowance("base", A, B, A), "POST", "/v1/chain/allowance", {"chain": "base", "token": A, "owner": B, "spender": A}),
+    (lambda c: c.portfolio("base", A, tokens=[B]), "POST", "/v1/chain/portfolio", {"chain": "base", "address": A, "tokens": [B]}),
+    (lambda c: c.swap_quote("base", A, B, amount_in="1"), "POST", "/v1/chain/quote", {"chain": "base", "token_in": A, "token_out": B, "amount_in": "1"}),
+    (lambda c: c.swap_quote("base", A, B, amount_in_raw="1000000"), "POST", "/v1/chain/quote",
+     {"chain": "base", "token_in": A, "token_out": B, "amount_in_raw": "1000000"}),
+    (lambda c: c.web_search("x402", count=3, freshness="week"), "POST", "/v1/search", {"query": "x402", "count": 3, "freshness": "week"}),
+    (lambda c: c.weather(place="Oslo, NO", hours=12), "POST", "/v1/weather", {"place": "Oslo, NO", "hours": 12}),
+    (lambda c: c.weather(59.9, 10.7), "POST", "/v1/weather", {"lat": 59.9, "lon": 10.7}),
     (lambda c: c.agents_summary(), "GET", "/v1/agents/summary", None),
     (lambda c: c.agents_query(network="base", q="weather", page_size=10), "POST", "/v1/agents/query",
      {"network": "base", "q": "weather", "page_size": 10}),
@@ -403,3 +421,66 @@ def test_unexpected_quote_is_refused_and_never_signed(override, throwaway_accoun
         client.gas_price("base")
     assert type(exc.value) is tanod.TanodError       # not a payment-flow subclass
     assert len(api.requests) == 1                     # nothing signed, no paid retry
+
+
+# --- new utility routes: validation and parsing ------------------------------
+
+
+@pytest.mark.parametrize("call", [
+    lambda c: c.extract_pdf("https://x.example/a.pdf", max_pages=0),
+    lambda c: c.extract_pdf("https://x.example/a.pdf", max_pages=201),
+    lambda c: c.ocr_image("https://x.example/a.png", lang="ENG!"),
+    lambda c: c.token_price("base", "DOGE/USD"),
+    lambda c: c.token_price("solana", "ETH/USD"),
+    lambda c: c.transaction("base", "0x1234"),
+    lambda c: c.nft("base", "nope", "1"),
+    lambda c: c.allowance("base", A, B, "nope"),
+    lambda c: c.portfolio("base", A, tokens=[A] * 21),
+    lambda c: c.portfolio("base", A, tokens=["nope"]),
+    lambda c: c.swap_quote("base", A, B),
+    lambda c: c.swap_quote("base", A, B, amount_in="1", amount_in_raw="1"),
+    lambda c: c.web_search("x", count=11),
+    lambda c: c.web_search("x", freshness="decade"),  # type: ignore[arg-type]
+    lambda c: c.weather(),
+    lambda c: c.weather(59.9),
+    lambda c: c.weather(59.9, 10.7, place="Oslo"),
+    lambda c: c.weather(place="Oslo", hours=49),
+    lambda c: c.weather(91, 10),
+])
+def test_new_routes_validate_before_any_network_call(call):
+    client, api = make(lambda req, n: httpx.Response(200, json={}))
+    with pytest.raises(InvalidRequestError):
+        call(client)
+    assert api.requests == []
+
+
+def test_new_routes_parse_responses():
+    bodies = {
+        "/v1/pdf": {"url": "u", "final_url": "u", "pages": 3, "extracted_pages": 3, "metadata": {"title": "T"}, "text": "hi",
+                    "truncated": False, "encrypted": False, "untrusted_content": True},
+        "/v1/chain/tx": {"chain": "base", "hash": TX, "status": "success", "from": A, "to": B, "fee": "0.00001"},
+        "/v1/chain/price": {"chain": "base", "pair": "ETH/USD", "price": "2500.1", "decimals": 8, "round_id": "1",
+                            "updated_at": 1, "age_seconds": 5, "stale": False, "feed": A},
+        "/v1/email/verify": {"email": "a@example.com", "syntax_valid": True, "verdict": "deliverable_likely", "smtp_checked": False},
+        "/v1/weather": {"location": {"lat": 1, "lon": 2}, "hours": 1, "hourly": [{"time": "t"}], "attribution": {"x": 1}},
+        "/v1/search": {"query": "q", "count": 1, "results": [{"title": "t", "url": "u", "snippet": "s", "rank": 1}], "cached": False},
+    }
+    client, _ = make(lambda req, n: httpx.Response(200, json=bodies[req.url.path]))
+    assert client.extract_pdf("https://x.example/a.pdf").text == "hi"
+    tx = client.transaction("base", TX)
+    assert tx.status == "success" and tx.from_ == A
+    assert client.token_price("base", "ETH/USD").stale is False
+    assert client.verify_email("a@example.com").verdict == "deliverable_likely"
+    assert client.weather(place="Oslo").hourly[0]["time"] == "t"
+    assert client.web_search("q").results[0]["rank"] == 1
+
+
+def test_async_new_methods():
+    api = FakeAPI(lambda req, n: httpx.Response(200, json={"query": "q", "count": 0, "results": []}))
+
+    async def run():
+        async with AsyncTanod(use_env=False, http_client=httpx.AsyncClient(transport=httpx.MockTransport(api))) as c:
+            return await c.web_search("q")
+
+    assert asyncio.run(run()).count == 0
+    assert api.requests[0].headers["X-Tanod-Free"] == "1"
