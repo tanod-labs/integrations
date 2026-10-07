@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "langchain-tanod"
+version = "0.1.0"
+description = "LangChain tools for Tanod: address risk checks, smart-contract scans, MCP/skill package scans, web/DNS/chain reads for AI agents. Pay per call with x402 (USDC on Base); free daily tier, no signup."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Tanod", email = "ops@tanod.dev" }]
+keywords = ["langchain", "tools", "x402", "ai-agents", "mcp", "security", "smart-contracts", "base", "usdc"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Security",
+  "Typing :: Typed",
+]
+dependencies = [
+  "tanod>=0.1.0,<0.2",
+  "langchain-core>=0.3.0,<2",
+]
+
+[project.optional-dependencies]
+wallet = ["tanod[wallet]>=0.1.0,<0.2"]
+dev = ["pytest>=8", "tanod[wallet]>=0.1.0,<0.2"]
+
+[project.urls]
+Homepage = "https://tanod.dev"
+Documentation = "https://tanod.dev/llms.txt"
+Source = "https://github.com/tanod-labs/integrations"
+Issues = "https://github.com/tanod-labs/integrations/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/langchain_tanod"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/langchain_tanod", "tests", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

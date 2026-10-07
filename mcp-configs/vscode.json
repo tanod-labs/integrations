@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "tanod": {
+      "type": "http",
+      "url": "https://tanod.dev/mcp"
+    }
+  }
+}
