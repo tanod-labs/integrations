@@ -48,6 +48,15 @@ def test_free_tier_call_without_wallet():
     assert api.requests[0].url.path == "/v1/chain/gas"
     assert api.body() == {"chain": "base"}
     assert "PAYMENT-SIGNATURE" not in api.requests[0].headers
+    assert api.requests[0].headers["X-Tanod-Free"] == "1"   # free tier is opt-in over HTTP
+
+
+def test_use_free_tier_false_omits_the_opt_in_header():
+    client, api = make(lambda req, n: response_402("1000"), use_free_tier=False)
+    assert client.use_free_tier is False
+    with pytest.raises(PaymentRequiredError):
+        client.gas_price("base")
+    assert "X-Tanod-Free" not in api.requests[0].headers
 
 
 def test_402_without_wallet_reports_price():
@@ -92,6 +101,8 @@ def test_paid_flow_signs_retries_and_returns_receipt(throwaway_account):
     out = client.gas_price("base")
     assert len(api.requests) == 2
     assert api.body(0) == api.body(1) == {"chain": "base"}
+    assert api.requests[0].headers["X-Tanod-Free"] == "1"
+    assert "X-Tanod-Free" not in api.requests[1].headers   # never on the paid retry
     sig = json.loads(base64.b64decode(api.requests[1].headers["PAYMENT-SIGNATURE"]))
     assert sig["x402Version"] == 2
     assert sig["accepted"]["amount"] == "1000"
@@ -336,6 +347,26 @@ def test_async_paid_flow(throwaway_account):
     assert out.symbol == "USDC"
     assert out.meta.payment.price_usd == Decimal("0.003")
     assert len(api.requests) == 2
+    assert api.requests[0].headers["X-Tanod-Free"] == "1"
+    assert "X-Tanod-Free" not in api.requests[1].headers
+
+
+def test_async_use_free_tier_false_pays_without_opt_in(throwaway_account):
+    def h(req, n):
+        if "PAYMENT-SIGNATURE" not in req.headers:
+            return response_402("1000")
+        return httpx.Response(200, json=GAS, headers={"PAYMENT-RESPONSE": settle_header("1000")})
+
+    api = FakeAPI(h)
+
+    async def run():
+        async with AsyncTanod(signer=throwaway_account, use_env=False, use_free_tier=False,
+                              http_client=httpx.AsyncClient(transport=httpx.MockTransport(api))) as c:
+            return await c.gas_price("base")
+
+    out = asyncio.run(run())
+    assert out.meta.paid and len(api.requests) == 2
+    assert all("X-Tanod-Free" not in req.headers for req in api.requests)
 
 
 def test_async_no_wallet_402():

@@ -23,8 +23,11 @@ The routes, prices and free tiers come from `https://tanod.dev/openapi.json`, `/
 
 ## Shared behaviour across the SDKs and tools
 
-1. **The free tier comes first.** Each call goes out unpaid. When the free daily tier covers it,
-   the server answers 200 and nothing is signed.
+1. **The free tier comes first.** Each call goes out unpaid, with the header `X-Tanod-Free: 1`
+   (the server's free tier is opt-in over HTTP; without the header an unpaid call gets the 402).
+   When the free daily tier covers it, the server answers 200 and nothing is signed. Turn this
+   off with `use_free_tier=False` (Python) or `useFreeTier: false` (TypeScript) to always pay.
+   The paid retry never carries the header.
 2. **On `402`, the client reads the x402 v2 quote** (`PAYMENT-REQUIRED`) and raises without
    signing anything when:
    - the quote says the input would be refused (`InvalidRequestError`);
