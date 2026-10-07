@@ -1,0 +1,7 @@
+{
+  "name": "tanod",
+  "transport": "streamable-http",
+  "url": "https://tanod.dev/mcp",
+  "authentication": "none",
+  "serverCard": "https://tanod.dev/.well-known/mcp/server-card.json"
+}

@@ -1,0 +1,28 @@
+# npm trusted publishing with provenance (no long-lived token). On npmjs.com, for each package,
+# add a trusted publisher: GitHub Actions, org tanod-labs, repo integrations, workflow publish-npm.yml.
+name: publish-npm
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Workspace package to publish
+        type: choice
+        options: ["@tanod/sdk", "@tanod/ai-sdk"]
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm publish -w "${{ inputs.package }}" --provenance --access public

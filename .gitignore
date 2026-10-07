@@ -1,0 +1,10 @@
+.venv/
+node_modules/
+dist/
+build/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+coverage/
+*.tsbuildinfo

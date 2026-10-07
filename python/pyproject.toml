@@ -1,0 +1,55 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tanod"
+dynamic = ["version"]
+description = "Python client for Tanod: pay-per-call security tools for AI agents (contract scan, address risk, MCP/skill package scan, chain reads), paid with x402 USDC on Base. Free daily tier, no signup."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Tanod", email = "ops@tanod.dev" }]
+keywords = ["x402", "ai-agents", "mcp", "security", "smart-contracts", "base", "usdc", "web3", "solidity"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security",
+  "Typing :: Typed",
+]
+dependencies = [
+  "httpx>=0.28.1,<1",
+  "pydantic>=2.6,<3",
+  "x402>=2.25.0,<3",
+]
+
+[project.optional-dependencies]
+# Needed only to PAY (sign x402 payments). Free-tier calls work without it.
+wallet = ["x402[evm]>=2.25.0,<3"]
+dev = ["pytest>=8", "x402[evm]>=2.25.0,<3"]
+
+[project.urls]
+Homepage = "https://tanod.dev"
+Documentation = "https://tanod.dev/llms.txt"
+"API reference" = "https://tanod.dev/openapi.json"
+Source = "https://github.com/tanod-labs/integrations"
+Issues = "https://github.com/tanod-labs/integrations/issues"
+
+[tool.hatch.version]
+path = "src/tanod/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tanod"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/tanod", "tests", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
