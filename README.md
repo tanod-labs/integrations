@@ -51,10 +51,10 @@ Signatures come from random, unfunded throwaway keys.
 
 | Suite | Command (from this directory) | Result on 2026-10-07 |
 |---|---|---|
-| Python SDK | `pip install -e "./python[dev]" && pytest -q python/tests` | **46 passed** |
-| LangChain | `pip install -e "./langchain[dev]" && pytest -q langchain/tests` | **25 passed** |
-| TypeScript SDK | `npm ci && npm test` (builds `@tanod/sdk`, then runs vitest) | **44 passed** |
-| AI SDK tools | included in `npm test`; includes an end-to-end `generateText` run with `MockLanguageModelV4` | **21 passed** |
+| Python SDK | `pip install -e "./python[dev]" && pytest -q python/tests` | **88 passed** |
+| LangChain | `pip install -e "./langchain[dev]" && pytest -q langchain/tests` | **40 passed** |
+| TypeScript SDK | `npm ci && npm test` (builds `@tanod/sdk`, then runs vitest) | **85 passed** |
+| AI SDK tools | included in `npm test`; includes an end-to-end `generateText` run with `MockLanguageModelV4` | **35 passed** |
 | Typecheck | `npm run typecheck` | clean |
 | Packaging | `python -m build` + `twine check` (both PyPI packages); `npm pack --dry-run` (both npm packages) | passed |
 
@@ -86,7 +86,7 @@ These checks ran against `https://tanod.dev` from the build VM with no wallet co
   - `tanod_agents_summary` and `tanod_gas_price` returned `ok:true`.
   - An oversized query returned `ok:false`, `invalid_input`.
 - **MCP**
-  - `initialize` and `tools/list` on `https://tanod.dev/mcp` returned 16 tools.
+  - `initialize` and `tools/list` on `https://tanod.dev/mcp` returned 30 tools.
 - **x402 signing**
   - A live 402 header from `/v1/chain/gas` was decoded and signed **offline** with the official
     `x402` Python package and a throwaway key. It was never sent.

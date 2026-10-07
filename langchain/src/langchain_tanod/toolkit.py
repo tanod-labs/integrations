@@ -13,7 +13,7 @@ from .tools import get_tanod_tools
 
 
 class TanodToolkit(BaseToolkit):
-    """Tanod tools (txpeek, pactlint, toolsniff, sitepeek, dnspeek, chainpeek, agentscan).
+    """Tanod tools (txpeek, pactlint, toolsniff, sitepeek, dnspeek, chainpeek, findpeek, weatherpeek, agentscan).
 
     Example:
         >>> toolkit = TanodToolkit(client=Tanod(max_price_usd=0.05))
