@@ -21,7 +21,7 @@ import json
 import logging
 import time
 from decimal import Decimal
-from typing import Any, Literal, Optional, Sequence, TypeVar, overload
+from typing import Any, Literal, Mapping, Optional, Sequence, TypeVar, Union, overload
 
 import httpx
 
@@ -561,6 +561,115 @@ class Tanod(_Base):
         Data: MET Norway and GeoNames, CC BY 4.0; credit them when you show or republish."""
         return self._call(r.weather(lat, lon, place, hours))
 
+    # -- skypeek / mlpeek / screening ---------------------------------------
+    def aviation_metar(
+        self, stations: Sequence[str], *, decode: Optional[bool] = None,
+    ) -> m.MetarReport:
+        """skypeek: current METAR reports for 1-20 ICAO stations (decoded by default). USD 0.001 per call; 5 free skypeek calls/IP/day (one pool)."""
+        return self._call(r.aviation_metar(stations, decode))
+
+    def aviation_taf(
+        self, stations: Sequence[str], *, decode: Optional[bool] = None,
+    ) -> m.MetarReport:
+        """skypeek: current TAF forecasts for 1-20 ICAO stations. USD 0.001 per call; shares the 5 free skypeek calls/IP/day."""
+        return self._call(r.aviation_taf(stations, decode))
+
+    def decode_report(
+        self, raw: str, *, kind: Optional[Literal["auto", "metar", "taf"]] = None,
+    ) -> m.ReportDecode:
+        """skypeek: decode one pasted METAR or TAF report. USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return self._call(r.decode_report(raw, kind))
+
+    def airport_lookup(
+        self, code: Optional[str] = None, *, query: Optional[str] = None, limit: Optional[int] = None, country: Optional[str] = None,
+    ) -> m.AirportResult:
+        """skypeek: airport by ICAO/IATA code, or search by name/city (code or query). USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return self._call(r.airport_lookup(code, query, limit, country))
+
+    def airport_distance(
+        self, origin: Union[str, Mapping[str, float]], destination: Union[str, Mapping[str, float]],
+    ) -> m.AirportDistance:
+        """skypeek: great-circle distance between two airport codes or {"lat","lon"} points. USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return self._call(r.airport_distance(origin, destination))
+
+    def space_weather(
+        self,
+    ) -> m.SpaceWeather:
+        """skypeek: Kp index, Kp forecast, solar wind and NOAA alerts. USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return self._call(r.space_weather())
+
+    def aurora(
+        self, lat: float, lon: float,
+    ) -> m.AuroraNowcast:
+        """skypeek: aurora nowcast probability at a location. USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return self._call(r.aurora(lat, lon))
+
+    def asteroids(
+        self, *, days: Optional[int] = None, dist_max_au: Optional[float] = None,
+    ) -> m.AsteroidApproaches:
+        """skypeek: asteroid and comet close approaches (1-30 days ahead). USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return self._call(r.asteroids(days, dist_max_au))
+
+    def sun_moon(
+        self, lat: float, lon: float, *, date: Optional[str] = None, tz: Optional[str] = None,
+    ) -> m.SunMoon:
+        """skypeek: sun and moon times for a place and date (YYYY-MM-DD, IANA tz). USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return self._call(r.sun_moon(lat, lon, date, tz))
+
+    def satellite_passes(
+        self, lat: float, lon: float, *, alt_m: Optional[float] = None, norad_id: Optional[int] = None, days: Optional[int] = None, min_elevation: Optional[float] = None, visible_only: Optional[bool] = None,
+    ) -> m.SatellitePasses:
+        """skypeek: pass predictions for the ISS (default) or another supported satellite. USD 0.002; shares the 5 free skypeek calls/IP/day."""
+        return self._call(r.satellite_passes(lat, lon, alt_m, norad_id, days, min_elevation, visible_only))
+
+    def embed(
+        self, texts: Sequence[str], *, model: Optional[Literal["small-en", "multilingual"]] = None, normalize: Optional[bool] = None, encoding: Optional[Literal["float", "base64"]] = None, input_type: Optional[Literal["none", "query", "passage"]] = None,
+    ) -> m.EmbedResult:
+        """mlpeek: 384-dimension embeddings of 1-64 texts. USD 0.0005 per text, at least USD 0.001 per call; 5 free mlpeek calls/IP/day (one pool)."""
+        return self._call(r.embed(texts, model, normalize, encoding, input_type))
+
+    def rerank(
+        self, query: str, documents: Sequence[str], *, top_k: Optional[int] = None,
+    ) -> m.RerankResult:
+        """mlpeek: cross-encoder rerank of up to 100 documents against a query. USD 0.002 per call; shares the 5 free mlpeek calls/IP/day."""
+        return self._call(r.rerank(query, documents, top_k))
+
+    def similarity(
+        self, a: Optional[str] = None, b: Optional[str] = None, *, pairs: Optional[Sequence[Any]] = None, model: Optional[Literal["small-en", "multilingual"]] = None,
+    ) -> m.SimilarityResult:
+        """mlpeek: cosine similarity of one pair (a, b) or 1-50 pairs. USD 0.0005 per pair, at least USD 0.001 per call; shares the 5 free mlpeek calls/IP/day."""
+        return self._call(r.similarity(a, b, pairs, model))
+
+    def ner(
+        self, text: str, *, labels: Optional[Sequence[str]] = None,
+    ) -> m.NerResult:
+        """mlpeek: named entities in English text (18 OntoNotes types). USD 0.001; shares the 5 free mlpeek calls/IP/day."""
+        return self._call(r.ner(text, labels))
+
+    def classify_zero_shot(
+        self, text: str, labels: Sequence[str], *, multi_label: Optional[bool] = None, hypothesis_template: Optional[str] = None,
+    ) -> m.ZeroShotResult:
+        """mlpeek: zero-shot classification into 1-10 caller labels. USD 0.001; shares the 5 free mlpeek calls/IP/day."""
+        return self._call(r.classify_zero_shot(text, labels, multi_label, hypothesis_template))
+
+    def check_url(
+        self, url: Optional[str] = None, *, domain: Optional[str] = None,
+    ) -> m.UrlCheck:
+        """Screening: is a URL or domain on two public phishing/scam lists? Only parsed, never fetched; not listed is not cleared. USD 0.001; shares the 10 free chain reads/IP/day."""
+        return self._call(r.check_url(url, domain))
+
+    def check_urls(
+        self, items: Sequence[str],
+    ) -> m.UrlCheckBatch:
+        """Screening: the URL check for 1-1,000 URLs or domains. USD 0.0002 per item, at least USD 0.001 per call; no free tier."""
+        return self._call(r.check_urls(items))
+
+    def sanctions_batch(
+        self, addresses: Sequence[str],
+    ) -> m.SanctionsBatch:
+        """Screening: US OFAC SDN digital-currency-address check for 1-1,000 addresses. USD 0.0005 per address, at least USD 0.002 per call; no free tier. Not legal advice."""
+        return self._call(r.sanctions_batch(addresses))
+
     # -- agentscan ---------------------------------------------------------
 
     def agents_summary(self) -> m.AgentsSummary:
@@ -889,6 +998,115 @@ class AsyncTanod(_Base):
         """weatherpeek: hourly forecast (up to 48 h) for lat+lon or a city (place). USD 0.002; 5 free/IP/day.
         Data: MET Norway and GeoNames, CC BY 4.0; credit them when you show or republish."""
         return await self._call(r.weather(lat, lon, place, hours))
+
+    # -- skypeek / mlpeek / screening ---------------------------------------
+    async def aviation_metar(
+        self, stations: Sequence[str], *, decode: Optional[bool] = None,
+    ) -> m.MetarReport:
+        """skypeek: current METAR reports for 1-20 ICAO stations (decoded by default). USD 0.001 per call; 5 free skypeek calls/IP/day (one pool)."""
+        return await self._call(r.aviation_metar(stations, decode))
+
+    async def aviation_taf(
+        self, stations: Sequence[str], *, decode: Optional[bool] = None,
+    ) -> m.MetarReport:
+        """skypeek: current TAF forecasts for 1-20 ICAO stations. USD 0.001 per call; shares the 5 free skypeek calls/IP/day."""
+        return await self._call(r.aviation_taf(stations, decode))
+
+    async def decode_report(
+        self, raw: str, *, kind: Optional[Literal["auto", "metar", "taf"]] = None,
+    ) -> m.ReportDecode:
+        """skypeek: decode one pasted METAR or TAF report. USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return await self._call(r.decode_report(raw, kind))
+
+    async def airport_lookup(
+        self, code: Optional[str] = None, *, query: Optional[str] = None, limit: Optional[int] = None, country: Optional[str] = None,
+    ) -> m.AirportResult:
+        """skypeek: airport by ICAO/IATA code, or search by name/city (code or query). USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return await self._call(r.airport_lookup(code, query, limit, country))
+
+    async def airport_distance(
+        self, origin: Union[str, Mapping[str, float]], destination: Union[str, Mapping[str, float]],
+    ) -> m.AirportDistance:
+        """skypeek: great-circle distance between two airport codes or {"lat","lon"} points. USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return await self._call(r.airport_distance(origin, destination))
+
+    async def space_weather(
+        self,
+    ) -> m.SpaceWeather:
+        """skypeek: Kp index, Kp forecast, solar wind and NOAA alerts. USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return await self._call(r.space_weather())
+
+    async def aurora(
+        self, lat: float, lon: float,
+    ) -> m.AuroraNowcast:
+        """skypeek: aurora nowcast probability at a location. USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return await self._call(r.aurora(lat, lon))
+
+    async def asteroids(
+        self, *, days: Optional[int] = None, dist_max_au: Optional[float] = None,
+    ) -> m.AsteroidApproaches:
+        """skypeek: asteroid and comet close approaches (1-30 days ahead). USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return await self._call(r.asteroids(days, dist_max_au))
+
+    async def sun_moon(
+        self, lat: float, lon: float, *, date: Optional[str] = None, tz: Optional[str] = None,
+    ) -> m.SunMoon:
+        """skypeek: sun and moon times for a place and date (YYYY-MM-DD, IANA tz). USD 0.001; shares the 5 free skypeek calls/IP/day."""
+        return await self._call(r.sun_moon(lat, lon, date, tz))
+
+    async def satellite_passes(
+        self, lat: float, lon: float, *, alt_m: Optional[float] = None, norad_id: Optional[int] = None, days: Optional[int] = None, min_elevation: Optional[float] = None, visible_only: Optional[bool] = None,
+    ) -> m.SatellitePasses:
+        """skypeek: pass predictions for the ISS (default) or another supported satellite. USD 0.002; shares the 5 free skypeek calls/IP/day."""
+        return await self._call(r.satellite_passes(lat, lon, alt_m, norad_id, days, min_elevation, visible_only))
+
+    async def embed(
+        self, texts: Sequence[str], *, model: Optional[Literal["small-en", "multilingual"]] = None, normalize: Optional[bool] = None, encoding: Optional[Literal["float", "base64"]] = None, input_type: Optional[Literal["none", "query", "passage"]] = None,
+    ) -> m.EmbedResult:
+        """mlpeek: 384-dimension embeddings of 1-64 texts. USD 0.0005 per text, at least USD 0.001 per call; 5 free mlpeek calls/IP/day (one pool)."""
+        return await self._call(r.embed(texts, model, normalize, encoding, input_type))
+
+    async def rerank(
+        self, query: str, documents: Sequence[str], *, top_k: Optional[int] = None,
+    ) -> m.RerankResult:
+        """mlpeek: cross-encoder rerank of up to 100 documents against a query. USD 0.002 per call; shares the 5 free mlpeek calls/IP/day."""
+        return await self._call(r.rerank(query, documents, top_k))
+
+    async def similarity(
+        self, a: Optional[str] = None, b: Optional[str] = None, *, pairs: Optional[Sequence[Any]] = None, model: Optional[Literal["small-en", "multilingual"]] = None,
+    ) -> m.SimilarityResult:
+        """mlpeek: cosine similarity of one pair (a, b) or 1-50 pairs. USD 0.0005 per pair, at least USD 0.001 per call; shares the 5 free mlpeek calls/IP/day."""
+        return await self._call(r.similarity(a, b, pairs, model))
+
+    async def ner(
+        self, text: str, *, labels: Optional[Sequence[str]] = None,
+    ) -> m.NerResult:
+        """mlpeek: named entities in English text (18 OntoNotes types). USD 0.001; shares the 5 free mlpeek calls/IP/day."""
+        return await self._call(r.ner(text, labels))
+
+    async def classify_zero_shot(
+        self, text: str, labels: Sequence[str], *, multi_label: Optional[bool] = None, hypothesis_template: Optional[str] = None,
+    ) -> m.ZeroShotResult:
+        """mlpeek: zero-shot classification into 1-10 caller labels. USD 0.001; shares the 5 free mlpeek calls/IP/day."""
+        return await self._call(r.classify_zero_shot(text, labels, multi_label, hypothesis_template))
+
+    async def check_url(
+        self, url: Optional[str] = None, *, domain: Optional[str] = None,
+    ) -> m.UrlCheck:
+        """Screening: is a URL or domain on two public phishing/scam lists? Only parsed, never fetched; not listed is not cleared. USD 0.001; shares the 10 free chain reads/IP/day."""
+        return await self._call(r.check_url(url, domain))
+
+    async def check_urls(
+        self, items: Sequence[str],
+    ) -> m.UrlCheckBatch:
+        """Screening: the URL check for 1-1,000 URLs or domains. USD 0.0002 per item, at least USD 0.001 per call; no free tier."""
+        return await self._call(r.check_urls(items))
+
+    async def sanctions_batch(
+        self, addresses: Sequence[str],
+    ) -> m.SanctionsBatch:
+        """Screening: US OFAC SDN digital-currency-address check for 1-1,000 addresses. USD 0.0005 per address, at least USD 0.002 per call; no free tier. Not legal advice."""
+        return await self._call(r.sanctions_batch(addresses))
 
     async def agents_summary(self) -> m.AgentsSummary:
         return await self._call(r.agents_summary())

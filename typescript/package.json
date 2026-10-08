@@ -1,6 +1,6 @@
 {
   "name": "@tanod-labs/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "TypeScript client for Tanod: pay-per-call security tools for AI agents (address risk, contract scan, MCP/skill package scan, chain reads), paid with x402 USDC on Base. Free daily tier, no signup.",
   "license": "MIT",
   "author": "Tanod <ops@tanod.dev>",

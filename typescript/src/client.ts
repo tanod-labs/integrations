@@ -30,7 +30,7 @@ import {
 } from "./errors.js";
 import type * as T from "./types.js";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 export const DEFAULT_BASE_URL = "https://tanod.dev";
 export const DEFAULT_MAX_PRICE_USD = 1;
 export const ENV_PRIVATE_KEY = "TANOD_PRIVATE_KEY";
@@ -104,6 +104,38 @@ function chain(value: string): T.Chain {
     throw new InvalidRequestError(`chain must be 'ethereum' or 'base', got ${JSON.stringify(value)}`);
   }
   return value;
+}
+
+function text(value: unknown, what: string, max: number): string {
+  if (typeof value !== "string" || value.length < 1 || value.length > max) throw new InvalidRequestError(`${what} must be 1-${max} characters`);
+  return value;
+}
+
+function strings(values: unknown, what: string, maxItems: number, maxLen: number): string[] {
+  if (!Array.isArray(values) || values.length < 1 || values.length > maxItems) throw new InvalidRequestError(`${what} must be a list of 1-${maxItems} strings`);
+  return values.map((v) => text(v, `each of ${what}`, maxLen));
+}
+
+function stationList(stations: string[]): string[] {
+  return strings(stations, "stations", 20, 16);
+}
+
+function latLon(lat: number, lon: number): void {
+  if (!(lat >= -90 && lat <= 90)) throw new InvalidRequestError("lat must be between -90 and 90");
+  if (!(lon >= -180 && lon <= 180)) throw new InvalidRequestError("lon must be between -180 and 180");
+}
+
+function geoPoint(value: T.GeoPoint, what: string): T.GeoPoint {
+  if (typeof value === "string" && value.length > 0) return value;
+  if (value && typeof value === "object" && typeof value.lat === "number" && typeof value.lon === "number") {
+    latLon(value.lat, value.lon);
+    return { lat: value.lat, lon: value.lon };
+  }
+  throw new InvalidRequestError(`${what} must be an airport code or { lat, lon }`);
+}
+
+function mlModel(model: string | undefined): void {
+  if (model !== undefined && model !== "small-en" && model !== "multilingual") throw new InvalidRequestError("model must be 'small-en' or 'multilingual'");
 }
 
 function compact(obj: Record<string, unknown>): Record<string, unknown> {
@@ -686,6 +718,170 @@ export class Tanod {
       path: "/v1/weather",
       body: compact({ lat: input.lat, lon: input.lon, place: input.place, hours: input.hours }),
     });
+  }
+
+  // -- skypeek ------------------------------------------------------------------
+
+  /** skypeek: current METAR reports for 1-20 ICAO stations (decoded unless decode=false). USD 0.001; 5 free skypeek calls/IP/day (one pool). */
+  async aviationMetar(stations: string[], opts: { decode?: boolean } = {}): Promise<T.WithMeta<T.MetarReport>> {
+    return this.#call({ method: "POST", path: "/v1/aviation/metar", body: compact({ stations: stationList(stations), decode: opts.decode }) });
+  }
+
+  /** skypeek: current TAF forecasts for 1-20 ICAO stations. USD 0.001; shares the 5 free skypeek calls/day. */
+  async aviationTaf(stations: string[], opts: { decode?: boolean } = {}): Promise<T.WithMeta<T.MetarReport>> {
+    return this.#call({ method: "POST", path: "/v1/aviation/taf", body: compact({ stations: stationList(stations), decode: opts.decode }) });
+  }
+
+  /** skypeek: decode one pasted METAR or TAF report. USD 0.001; shares the 5 free skypeek calls/day. */
+  async decodeReport(raw: string, opts: { kind?: "auto" | "metar" | "taf" } = {}): Promise<T.WithMeta<T.ReportDecode>> {
+    if (opts.kind !== undefined && !["auto", "metar", "taf"].includes(opts.kind)) throw new InvalidRequestError("kind must be 'auto', 'metar' or 'taf'");
+    return this.#call({ method: "POST", path: "/v1/aviation/metar/decode", body: compact({ raw: text(raw, "raw", 2000), kind: opts.kind }) });
+  }
+
+  /** skypeek: airport by ICAO/IATA `code`, or search by `query` (name or city). Give one. USD 0.001; shares the 5 free skypeek calls/day. */
+  async airportLookup(input: { code?: string; query?: string; limit?: number; country?: string }): Promise<T.WithMeta<T.AirportResult>> {
+    if ((input.code === undefined) === (input.query === undefined)) throw new InvalidRequestError("give code or query, not both");
+    if (input.code !== undefined && (input.code.length < 2 || input.code.length > 8)) throw new InvalidRequestError("code must be 2-8 characters");
+    if (input.query !== undefined && (input.query.length < 2 || input.query.length > 100)) throw new InvalidRequestError("query must be 2-100 characters");
+    if (input.limit !== undefined && (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 20)) throw new InvalidRequestError("limit must be an integer between 1 and 20");
+    if (input.country !== undefined && input.country.length !== 2) throw new InvalidRequestError("country must be a two-letter ISO 3166-1 code");
+    return this.#call({ method: "POST", path: "/v1/aviation/airport", body: compact({ ...input }) });
+  }
+
+  /** skypeek: great-circle distance between two airport codes or { lat, lon } points. USD 0.001; shares the 5 free skypeek calls/day. */
+  async airportDistance(from: T.GeoPoint, to: T.GeoPoint): Promise<T.WithMeta<T.AirportDistance>> {
+    return this.#call({ method: "POST", path: "/v1/aviation/distance", body: { from: geoPoint(from, "from"), to: geoPoint(to, "to") } });
+  }
+
+  /** skypeek: Kp index, Kp forecast, solar wind and NOAA alerts. USD 0.001; shares the 5 free skypeek calls/day. */
+  async spaceWeather(): Promise<T.WithMeta<T.SpaceWeather>> {
+    return this.#call({ method: "POST", path: "/v1/space/weather", body: {} });
+  }
+
+  /** skypeek: aurora nowcast probability at a location. USD 0.001; shares the 5 free skypeek calls/day. */
+  async aurora(lat: number, lon: number): Promise<T.WithMeta<T.AuroraNowcast>> {
+    latLon(lat, lon);
+    return this.#call({ method: "POST", path: "/v1/space/aurora", body: { lat, lon } });
+  }
+
+  /** skypeek: asteroid and comet close approaches (days 1-30, distMaxAu 0.0001-0.2). USD 0.001; shares the 5 free skypeek calls/day. */
+  async asteroids(opts: { days?: number; distMaxAu?: number } = {}): Promise<T.WithMeta<T.AsteroidApproaches>> {
+    if (opts.days !== undefined && (!Number.isInteger(opts.days) || opts.days < 1 || opts.days > 30)) throw new InvalidRequestError("days must be an integer between 1 and 30");
+    if (opts.distMaxAu !== undefined && !(opts.distMaxAu >= 0.0001 && opts.distMaxAu <= 0.2)) throw new InvalidRequestError("distMaxAu must be between 0.0001 and 0.2");
+    return this.#call({ method: "POST", path: "/v1/space/asteroids", body: compact({ days: opts.days, dist_max_au: opts.distMaxAu }) });
+  }
+
+  /** skypeek: sun and moon times for a place and date (YYYY-MM-DD, default today; IANA tz, default UTC). USD 0.001; shares the 5 free skypeek calls/day. */
+  async sunMoon(lat: number, lon: number, opts: { date?: string; tz?: string } = {}): Promise<T.WithMeta<T.SunMoon>> {
+    latLon(lat, lon);
+    if (opts.date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(opts.date)) throw new InvalidRequestError("date must be YYYY-MM-DD");
+    if (opts.tz !== undefined) text(opts.tz, "tz", 64);
+    return this.#call({ method: "POST", path: "/v1/space/sun-moon", body: compact({ lat, lon, date: opts.date, tz: opts.tz }) });
+  }
+
+  /** skypeek: pass predictions for the ISS (default noradId 25544) or another supported satellite. USD 0.002; shares the 5 free skypeek calls/day. */
+  async satellitePasses(
+    lat: number,
+    lon: number,
+    opts: { altM?: number; noradId?: number; days?: number; minElevation?: number; visibleOnly?: boolean } = {},
+  ): Promise<T.WithMeta<T.SatellitePasses>> {
+    latLon(lat, lon);
+    if (opts.altM !== undefined && !(opts.altM >= -500 && opts.altM <= 9000)) throw new InvalidRequestError("altM must be between -500 and 9000");
+    if (opts.noradId !== undefined && (!Number.isInteger(opts.noradId) || opts.noradId < 1)) throw new InvalidRequestError("noradId must be a positive integer");
+    if (opts.days !== undefined && (!Number.isInteger(opts.days) || opts.days < 1 || opts.days > 3)) throw new InvalidRequestError("days must be an integer between 1 and 3");
+    if (opts.minElevation !== undefined && !(opts.minElevation >= 0 && opts.minElevation <= 89)) throw new InvalidRequestError("minElevation must be between 0 and 89");
+    return this.#call({
+      method: "POST",
+      path: "/v1/space/passes",
+      body: compact({ lat, lon, alt_m: opts.altM, norad_id: opts.noradId, days: opts.days, min_elevation: opts.minElevation, visible_only: opts.visibleOnly }),
+    });
+  }
+
+  // -- mlpeek -------------------------------------------------------------------
+
+  /** mlpeek: 384-dimension embeddings of 1-64 texts. USD 0.0005 per text, at least USD 0.001 per call; 5 free mlpeek calls/IP/day (one pool). */
+  async embed(
+    texts: string[],
+    opts: { model?: T.MlModel; normalize?: boolean; encoding?: "float" | "base64"; inputType?: "none" | "query" | "passage" } = {},
+  ): Promise<T.WithMeta<T.EmbedResult>> {
+    mlModel(opts.model);
+    if (opts.encoding !== undefined && !["float", "base64"].includes(opts.encoding)) throw new InvalidRequestError("encoding must be 'float' or 'base64'");
+    if (opts.inputType !== undefined && !["none", "query", "passage"].includes(opts.inputType)) throw new InvalidRequestError("inputType must be 'none', 'query' or 'passage'");
+    return this.#call({
+      method: "POST",
+      path: "/v1/embed",
+      body: compact({ texts: strings(texts, "texts", 64, 8000), model: opts.model, normalize: opts.normalize, encoding: opts.encoding, input_type: opts.inputType }),
+    });
+  }
+
+  /** mlpeek: cross-encoder rerank of up to 100 documents against a query. USD 0.002 per call; shares the 5 free mlpeek calls/day. */
+  async rerank(query: string, documents: string[], opts: { topK?: number } = {}): Promise<T.WithMeta<T.RerankResult>> {
+    if (opts.topK !== undefined && (!Number.isInteger(opts.topK) || opts.topK < 1 || opts.topK > 100)) throw new InvalidRequestError("topK must be an integer between 1 and 100");
+    return this.#call({
+      method: "POST",
+      path: "/v1/rerank",
+      body: compact({ query: text(query, "query", 2000), documents: strings(documents, "documents", 100, 4000), top_k: opts.topK }),
+    });
+  }
+
+  /** mlpeek: cosine similarity of one pair `{ a, b }` or 1-50 `pairs`. USD 0.0005 per pair, at least USD 0.001 per call; shares the 5 free mlpeek calls/day. */
+  async similarity(input: { a?: string; b?: string; pairs?: { a: string; b: string }[]; model?: T.MlModel }): Promise<T.WithMeta<T.SimilarityResult>> {
+    mlModel(input.model);
+    const single = input.a !== undefined || input.b !== undefined;
+    if (single === (input.pairs !== undefined) || (single && (input.a === undefined || input.b === undefined))) throw new InvalidRequestError("give a and b together, or pairs");
+    let body: Record<string, unknown>;
+    if (single) body = { a: text(input.a as string, "a", 4000), b: text(input.b as string, "b", 4000) };
+    else {
+      const pairs = input.pairs as { a: string; b: string }[];
+      if (!Array.isArray(pairs) || pairs.length < 1 || pairs.length > 50) throw new InvalidRequestError("pairs must be a list of 1-50 { a, b } pairs");
+      body = { pairs: pairs.map((p) => ({ a: text(p?.a, "pair a", 4000), b: text(p?.b, "pair b", 4000) })) };
+    }
+    if (input.model !== undefined) body.model = input.model;
+    return this.#call({ method: "POST", path: "/v1/similarity", body });
+  }
+
+  /** mlpeek: named entities in English text (18 OntoNotes types; optionally only `labels`). USD 0.001; shares the 5 free mlpeek calls/day. */
+  async ner(textIn: string, opts: { labels?: string[] } = {}): Promise<T.WithMeta<T.NerResult>> {
+    if (opts.labels !== undefined && (!Array.isArray(opts.labels) || opts.labels.length < 1 || opts.labels.length > 18)) throw new InvalidRequestError("labels must be a list of 1-18 entity types");
+    return this.#call({ method: "POST", path: "/v1/ner", body: compact({ text: text(textIn, "text", 20000), labels: opts.labels }) });
+  }
+
+  /** mlpeek: zero-shot classification of English text into 1-10 caller labels. USD 0.001; shares the 5 free mlpeek calls/day. */
+  async classifyZeroShot(
+    textIn: string,
+    labels: string[],
+    opts: { multiLabel?: boolean; hypothesisTemplate?: string } = {},
+  ): Promise<T.WithMeta<T.ZeroShotResult>> {
+    const lab = strings(labels, "labels", 10, 100);
+    if (new Set(lab).size !== lab.length) throw new InvalidRequestError("labels must be unique");
+    const tpl = opts.hypothesisTemplate;
+    if (tpl !== undefined && (tpl.split("{}").length !== 2 || tpl.length < 2 || tpl.length > 200)) throw new InvalidRequestError("hypothesisTemplate must contain {} exactly once (2-200 characters)");
+    return this.#call({
+      method: "POST",
+      path: "/v1/classify/zero-shot",
+      body: compact({ text: text(textIn, "text", 2000), labels: lab, multi_label: opts.multiLabel, hypothesis_template: tpl }),
+    });
+  }
+
+  // -- screening ----------------------------------------------------------------
+
+  /** Screening: is a URL or domain on two public phishing/scam lists? Parsed, never fetched; not listed is not cleared. USD 0.001; shares the 10 free chain reads/IP/day. */
+  async checkUrl(input: { url?: string; domain?: string }): Promise<T.WithMeta<T.UrlCheck>> {
+    if ((input.url === undefined) === (input.domain === undefined)) throw new InvalidRequestError("give url or domain, not both");
+    const body = input.url !== undefined ? { url: text(input.url, "url", 2048) } : { domain: text(input.domain as string, "domain", 2048) };
+    return this.#call({ method: "POST", path: "/v1/check/url", body });
+  }
+
+  /** Screening: the URL check for 1-1,000 URLs or domains. USD 0.0002 per item, at least USD 0.001 per call; no free tier. */
+  async checkUrls(items: string[]): Promise<T.WithMeta<T.UrlCheckBatch>> {
+    return this.#call({ method: "POST", path: "/v1/check/url/batch", body: { items: strings(items, "items", 1000, 2048) } });
+  }
+
+  /** Screening: US OFAC SDN digital-currency-address check for 1-1,000 addresses. USD 0.0005 per address, at least USD 0.002 per call; no free tier. Not legal advice. */
+  async sanctionsBatch(addresses: string[]): Promise<T.WithMeta<T.SanctionsBatch>> {
+    const addrs = strings(addresses, "addresses", 1000, 128);
+    if (addrs.some((a) => !/^[A-Za-z0-9:_.-]{1,128}$/.test(a))) throw new InvalidRequestError("addresses may only contain letters, digits and : _ . -");
+    return this.#call({ method: "POST", path: "/v1/sanctions/batch", body: { addresses: addrs } });
   }
 
   // -- agentscan ---------------------------------------------------------------

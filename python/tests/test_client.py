@@ -484,3 +484,81 @@ def test_async_new_methods():
 
     assert asyncio.run(run()).count == 0
     assert api.requests[0].headers["X-Tanod-Free"] == "1"
+
+
+# --- skypeek / mlpeek / screening (0.2.0) -----------------------------------
+
+NEW_ROUTES = [
+    (lambda c: c.aviation_metar(["RPLL", "KSFO"]), "/v1/aviation/metar", {"stations": ["RPLL", "KSFO"]}),
+    (lambda c: c.aviation_taf(["RPLL"], decode=False), "/v1/aviation/taf", {"stations": ["RPLL"], "decode": False}),
+    (lambda c: c.decode_report("METAR RPLL 010000Z 00000KT", kind="metar"), "/v1/aviation/metar/decode",
+     {"raw": "METAR RPLL 010000Z 00000KT", "kind": "metar"}),
+    (lambda c: c.airport_lookup("MNL"), "/v1/aviation/airport", {"code": "MNL"}),
+    (lambda c: c.airport_lookup(query="Manila", limit=3, country="PH"), "/v1/aviation/airport",
+     {"query": "Manila", "limit": 3, "country": "PH"}),
+    (lambda c: c.airport_distance("RPLL", {"lat": 1.0, "lon": 2.0}), "/v1/aviation/distance",
+     {"from": "RPLL", "to": {"lat": 1.0, "lon": 2.0}}),
+    (lambda c: c.space_weather(), "/v1/space/weather", {}),
+    (lambda c: c.aurora(65.0, 25.0), "/v1/space/aurora", {"lat": 65.0, "lon": 25.0}),
+    (lambda c: c.asteroids(days=14, dist_max_au=0.1), "/v1/space/asteroids", {"days": 14, "dist_max_au": 0.1}),
+    (lambda c: c.sun_moon(14.6, 121.0, date="2026-10-08", tz="Asia/Manila"), "/v1/space/sun-moon",
+     {"lat": 14.6, "lon": 121.0, "date": "2026-10-08", "tz": "Asia/Manila"}),
+    (lambda c: c.satellite_passes(14.6, 121.0, days=1, visible_only=True), "/v1/space/passes",
+     {"lat": 14.6, "lon": 121.0, "days": 1, "visible_only": True}),
+    (lambda c: c.embed(["a", "b"], model="multilingual", input_type="query"), "/v1/embed",
+     {"texts": ["a", "b"], "model": "multilingual", "input_type": "query"}),
+    (lambda c: c.rerank("q", ["d1", "d2"], top_k=1), "/v1/rerank", {"query": "q", "documents": ["d1", "d2"], "top_k": 1}),
+    (lambda c: c.similarity("x", "y"), "/v1/similarity", {"a": "x", "b": "y"}),
+    (lambda c: c.similarity(pairs=[("x", "y"), {"a": "p", "b": "q"}]), "/v1/similarity",
+     {"pairs": [{"a": "x", "b": "y"}, {"a": "p", "b": "q"}]}),
+    (lambda c: c.ner("Ada met Bob in Paris.", labels=["PERSON"]), "/v1/ner", {"text": "Ada met Bob in Paris.", "labels": ["PERSON"]}),
+    (lambda c: c.classify_zero_shot("great", ["pos", "neg"], multi_label=True), "/v1/classify/zero-shot",
+     {"text": "great", "labels": ["pos", "neg"], "multi_label": True}),
+    (lambda c: c.check_url("https://x.example/a"), "/v1/check/url", {"url": "https://x.example/a"}),
+    (lambda c: c.check_url(domain="x.example"), "/v1/check/url", {"domain": "x.example"}),
+    (lambda c: c.check_urls(["a.example", "b.example"]), "/v1/check/url/batch", {"items": ["a.example", "b.example"]}),
+    (lambda c: c.sanctions_batch([A, "bc1qxyz"]), "/v1/sanctions/batch", {"addresses": [A, "bc1qxyz"]}),
+]
+
+
+@pytest.mark.parametrize("call,path,body", NEW_ROUTES)
+def test_skypeek_mlpeek_screening_requests(call, path, body):
+    client, api = make(lambda req, n: httpx.Response(200, json={"kind": "metar", "decoded": {}, "distance_km": 1.0,
+                                                                 "listed": False, "lat": 1, "lon": 2, "date": "d", "days": 1}))
+    call(client)
+    req = api.requests[0]
+    assert req.method == "POST" and req.url.path == path
+    assert json.loads(req.content) == body
+
+
+@pytest.mark.parametrize("call", [
+    lambda c: c.aviation_metar([]),
+    lambda c: c.aviation_metar(["A"] * 21),
+    lambda c: c.aviation_metar("RPLL"),
+    lambda c: c.decode_report("x", kind="foo"),  # type: ignore[arg-type]
+    lambda c: c.airport_lookup(),
+    lambda c: c.airport_lookup("MNL", query="Manila"),
+    lambda c: c.airport_distance("RPLL", {"lat": 91, "lon": 0}),
+    lambda c: c.aurora(91, 0),
+    lambda c: c.asteroids(days=31),
+    lambda c: c.sun_moon(0, 0, date="08-10-2026"),
+    lambda c: c.satellite_passes(0, 0, days=4),
+    lambda c: c.embed([]),
+    lambda c: c.embed(["x"] * 65),
+    lambda c: c.embed(["x"], model="big"),  # type: ignore[arg-type]
+    lambda c: c.rerank("q", ["d"] * 101),
+    lambda c: c.similarity("only a"),
+    lambda c: c.similarity("a", "b", pairs=[("x", "y")]),
+    lambda c: c.ner(""),
+    lambda c: c.classify_zero_shot("t", ["a", "a"]),
+    lambda c: c.classify_zero_shot("t", ["a"], hypothesis_template="no braces"),
+    lambda c: c.check_url(),
+    lambda c: c.check_url("a", domain="b"),
+    lambda c: c.check_urls(["x"] * 1001),
+    lambda c: c.sanctions_batch(["bad address!"]),
+])
+def test_skypeek_mlpeek_screening_validate_before_any_network_call(call):
+    client, api = make(lambda req, n: httpx.Response(200, json={}))
+    with pytest.raises(InvalidRequestError):
+        call(client)
+    assert api.requests == []

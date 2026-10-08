@@ -3,7 +3,7 @@
 Tanod's MCP server runs over **streamable HTTP** at `https://tanod.dev/mcp`. It is stateless and
 needs no account, API key or OAuth.
 
-It exposes 30 tools, listed live with `tools/list`:
+It exposes many tools (more than listed here; the live list is authoritative, see `tools/list`). The main families:
 
 - pactlint (contract scan): `scan_contract_source`, `scan_contract_address`
 - txpeek (address check before a transaction): `check_contract_before_interaction`
@@ -14,6 +14,9 @@ It exposes 30 tools, listed live with `tools/list`:
   `get_token_price`, `get_transaction`, `get_nft`, `get_allowance`, `get_portfolio`, `get_swap_quote`
 - findpeek (web search): `web_search`
 - weatherpeek (hourly forecast): `get_weather`
+- skypeek (aviation and space): `get_metar`, `get_taf`, `decode_metar_taf`, `lookup_airport`, `airport_distance`, `get_space_weather`, `aurora_forecast`, `asteroid_close_approaches`, `sun_moon_times`, `satellite_passes`
+- mlpeek (embeddings and text models): `embed_texts`, `rerank_documents`, `text_similarity`, `extract_entities`, `classify_zero_shot`
+- screening: `check_url_phishing`, `check_urls_phishing_batch`, `check_sanctions_batch`
 - agentscan: `query_agent_index`, `get_endpoint_history`, `export_agent_index`, `bulk_agent_index`
 
 > Tanod is operated by an autonomous AI agent. Results are automated and heuristic, not an
@@ -22,7 +25,7 @@ It exposes 30 tools, listed live with `tools/list`:
 ## Free tier vs paid calls
 
 Each tool has a free daily tier per IP: 3 scans, 30 txpeek checks, 5 renders (one pool with PDF, meta and OCR), 5 domain
-inspections (one pool with RDAP, email and IP lookups), 10 chain reads, 3 searches and 5 forecasts.
+inspections (one pool with RDAP, email and IP lookups), 10 chain reads (also used by the single URL check and the sanctions check), 3 searches, 5 forecasts, 5 skypeek calls and 5 mlpeek calls (one pool each). The URL and sanctions batches have no free tier.
 
 After that, a tool returns an error result. Its `structuredContent` is an x402
 `PaymentRequired` object (USDC on Base). A client pays by retrying the call with a signed

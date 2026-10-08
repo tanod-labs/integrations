@@ -113,6 +113,24 @@ def test_check_address_tool_output():
         ("tanod_get_swap_quote", {"token_in": A, "token_out": A, "amount_in": "1"}, "/v1/chain/quote", {"chain": "base", "token_in": A, "token_out": A, "amount_in": "1"}),
         ("tanod_web_search", {"query": "x402", "count": 3}, "/v1/search", {"query": "x402", "count": 3}),
         ("tanod_get_weather", {"place": "Oslo, NO"}, "/v1/weather", {"place": "Oslo, NO"}),
+        ("tanod_get_metar", {"stations": ["RPLL"]}, "/v1/aviation/metar", {"stations": ["RPLL"]}),
+        ("tanod_get_taf", {"stations": ["RPLL"], "decode": False}, "/v1/aviation/taf", {"stations": ["RPLL"], "decode": False}),
+        ("tanod_decode_metar_taf", {"raw": "METAR RPLL 010000Z"}, "/v1/aviation/metar/decode", {"raw": "METAR RPLL 010000Z"}),
+        ("tanod_lookup_airport", {"code": "MNL"}, "/v1/aviation/airport", {"code": "MNL"}),
+        ("tanod_airport_distance", {"origin": "RPLL", "destination": {"lat": 1, "lon": 2}}, "/v1/aviation/distance", {"from": "RPLL", "to": {"lat": 1.0, "lon": 2.0}}),
+        ("tanod_get_space_weather", {}, "/v1/space/weather", {}),
+        ("tanod_aurora_forecast", {"lat": 65, "lon": 25}, "/v1/space/aurora", {"lat": 65.0, "lon": 25.0}),
+        ("tanod_asteroid_close_approaches", {"days": 14}, "/v1/space/asteroids", {"days": 14}),
+        ("tanod_sun_moon_times", {"lat": 14.6, "lon": 121, "tz": "Asia/Manila"}, "/v1/space/sun-moon", {"lat": 14.6, "lon": 121.0, "tz": "Asia/Manila"}),
+        ("tanod_satellite_passes", {"lat": 14.6, "lon": 121, "days": 1}, "/v1/space/passes", {"lat": 14.6, "lon": 121.0, "days": 1}),
+        ("tanod_embed_texts", {"texts": ["a", "b"], "model": "multilingual"}, "/v1/embed", {"texts": ["a", "b"], "model": "multilingual"}),
+        ("tanod_rerank_documents", {"query": "q", "documents": ["d"], "top_k": 1}, "/v1/rerank", {"query": "q", "documents": ["d"], "top_k": 1}),
+        ("tanod_text_similarity", {"a": "x", "b": "y"}, "/v1/similarity", {"a": "x", "b": "y"}),
+        ("tanod_extract_entities", {"text": "Ada met Bob.", "labels": ["PERSON"]}, "/v1/ner", {"text": "Ada met Bob.", "labels": ["PERSON"]}),
+        ("tanod_classify_zero_shot", {"text": "great", "labels": ["pos", "neg"]}, "/v1/classify/zero-shot", {"text": "great", "labels": ["pos", "neg"]}),
+        ("tanod_check_url", {"url": "https://x.example/a"}, "/v1/check/url", {"url": "https://x.example/a"}),
+        ("tanod_check_urls", {"items": ["a.example"]}, "/v1/check/url/batch", {"items": ["a.example"]}),
+        ("tanod_check_sanctions_batch", {"addresses": [A]}, "/v1/sanctions/batch", {"addresses": [A]}),
         ("tanod_agents_export", {"network": "base"}, "/v1/agents/export", {"network": "base", "limit": 200, "format": "json"}),
     ],
 )
@@ -206,4 +224,21 @@ def test_new_tools_are_opt_in_and_validated():
     assert out.startswith("Invalid input")
     out = tools["tanod_get_weather"].invoke({})
     assert out.startswith("Invalid input")
+    assert seen == []
+
+
+def test_skypeek_mlpeek_screening_tools_are_opt_in_and_validated():
+    new = [
+        "tanod_get_metar", "tanod_get_taf", "tanod_decode_metar_taf", "tanod_lookup_airport", "tanod_airport_distance",
+        "tanod_get_space_weather", "tanod_aurora_forecast", "tanod_asteroid_close_approaches", "tanod_sun_moon_times",
+        "tanod_satellite_passes", "tanod_embed_texts", "tanod_rerank_documents", "tanod_text_similarity",
+        "tanod_extract_entities", "tanod_classify_zero_shot", "tanod_check_url", "tanod_check_urls",
+        "tanod_check_sanctions_batch",
+    ]
+    assert all(n in TOOL_NAMES and n not in DEFAULT_TOOL_NAMES for n in new)
+    c, seen = client_with(lambda r: httpx.Response(200, json={}))
+    tools = tools_by_name(c, include=new)
+    assert tools["tanod_text_similarity"].invoke({"a": "only a"}).startswith("Invalid input")
+    assert tools["tanod_check_url"].invoke({}).startswith("Invalid input")
+    assert tools["tanod_lookup_airport"].invoke({}).startswith("Invalid input")
     assert seen == []

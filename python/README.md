@@ -2,7 +2,7 @@
 
 Python client for [Tanod](https://tanod.dev): pay-per-call security and utility tools for AI
 agents. No signup and no API key. You pay per call in USDC on Base with
-[x402](https://x402.org), and every tool has a free daily tier (except the bulk exports).
+[x402](https://x402.org), and every tool has a free daily tier (except the bulk exports and the URL and sanctions batches).
 
 | Product | Method | Price (USD) | Free per IP per UTC day |
 |---|---|---|---|
@@ -17,6 +17,9 @@ agents. No signup and no API key. You pay per call in USDC on Base with
 | **chainpeek**: ENS, calldata, token, balance, gas, block, Chainlink price, transaction, NFT, allowance, portfolio, swap quote | `resolve_ens`, `decode_calldata`, `token_info`, `balance`, `gas_price`, `latest_block`, `token_price`, `transaction`, `nft`, `allowance`, `portfolio`, `swap_quote` | 0.001 to 0.004 (portfolio 0.004; `swap_quote` is a spot quote, not a firm price) | 10 (shared) |
 | **findpeek**: web search | `web_search` | 0.012 | 3 |
 | **weatherpeek**: hourly forecast (MET Norway, CC BY 4.0) | `weather` | 0.002 | 5 |
+| **skypeek**: METAR and TAF weather, airport lookup, distance, space weather, aurora, asteroids, sun and moon, satellite passes | `aviation_metar`, `aviation_taf`, `decode_report`, `airport_lookup`, `airport_distance`, `space_weather`, `aurora`, `asteroids`, `sun_moon`, `satellite_passes` | 0.001 each (`satellite_passes` 0.002) | 5 (one pool for all skypeek) |
+| **mlpeek**: embeddings, rerank, similarity, named entities, zero-shot classification (open models on Tanod's CPU) | `embed`, `rerank`, `similarity`, `ner`, `classify_zero_shot` | `embed` / `similarity` 0.0005 per text / pair, at least 0.001 per call; `rerank` 0.002; `ner` / `classify_zero_shot` 0.001 | 5 (one pool for all mlpeek) |
+| **screening**: phishing/scam list check for URLs, OFAC SDN check for crypto addresses | `check_url`, `check_urls`, `sanctions_batch` | `check_url` 0.001; `check_urls` 0.0002 per item (at least 0.001); `sanctions_batch` 0.0005 per address (at least 0.002) | `check_url` shares the 10 chain reads; batches have none |
 | **agentscan**: index of x402 endpoints and MCP servers | `agents_summary` (free), `agents_query`, `agents_history`, `agents_export`, `agents_bulk` | free / 0.02 / 0.05 / 0.25 / 2.00 | unlimited / 10 / 5 / none / none |
 | Stored reports, health | `get_report`, `health` | free | n/a |
 
