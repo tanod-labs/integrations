@@ -331,6 +331,236 @@ def weather(
     return Route("POST", "/v1/weather", m.WeatherForecast, body)
 
 
+# --- skypeek --------------------------------------------------------------
+
+
+def _stations(stations: Sequence[str]) -> list[str]:
+    if isinstance(stations, str) or not 1 <= len(stations) <= 20:
+        raise InvalidRequestError("stations must be a list of 1-20 ICAO identifiers")
+    if any(not isinstance(x, str) or not 1 <= len(x) <= 16 for x in stations):
+        raise InvalidRequestError("each station must be a string of 1-16 characters")
+    return list(stations)
+
+
+def _latlon(lat: float, lon: float) -> None:
+    if not -90 <= lat <= 90:
+        raise InvalidRequestError("lat must be between -90 and 90")
+    if not -180 <= lon <= 180:
+        raise InvalidRequestError("lon must be between -180 and 180")
+
+
+def _text(value: Any, what: str, max_len: int) -> str:
+    if not isinstance(value, str) or not 1 <= len(value) <= max_len:
+        raise InvalidRequestError(f"{what} must be 1-{max_len} characters")
+    return value
+
+
+def _strings(values: Sequence[str], what: str, max_items: int, max_len: int) -> list[str]:
+    if isinstance(values, str) or not 1 <= len(values) <= max_items:
+        raise InvalidRequestError(f"{what} must be a list of 1-{max_items} strings")
+    return [_text(v, f"each of {what}", max_len) for v in values]
+
+
+def aviation_metar(stations: Sequence[str], decode: Optional[bool]) -> Route:
+    return Route("POST", "/v1/aviation/metar", m.MetarReport, _drop_none({"stations": _stations(stations), "decode": decode}))
+
+
+def aviation_taf(stations: Sequence[str], decode: Optional[bool]) -> Route:
+    return Route("POST", "/v1/aviation/taf", m.MetarReport, _drop_none({"stations": _stations(stations), "decode": decode}))
+
+
+def decode_report(raw: str, kind: Optional[str]) -> Route:
+    if kind is not None and kind not in ("auto", "metar", "taf"):
+        raise InvalidRequestError("kind must be 'auto', 'metar' or 'taf'")
+    return Route("POST", "/v1/aviation/metar/decode", m.ReportDecode, _drop_none({"raw": _text(raw, "raw", 2000), "kind": kind}))
+
+
+def airport_lookup(code: Optional[str], query: Optional[str], limit: Optional[int], country: Optional[str]) -> Route:
+    if (code is None) == (query is None):
+        raise InvalidRequestError("give code or query, not both")
+    if code is not None and not 2 <= len(code) <= 8:
+        raise InvalidRequestError("code must be 2-8 characters")
+    if query is not None and not 2 <= len(query) <= 100:
+        raise InvalidRequestError("query must be 2-100 characters")
+    if limit is not None and not 1 <= limit <= 20:
+        raise InvalidRequestError("limit must be between 1 and 20")
+    if country is not None and len(country) != 2:
+        raise InvalidRequestError("country must be a two-letter ISO 3166-1 code")
+    return Route("POST", "/v1/aviation/airport", m.AirportResult,
+                 _drop_none({"code": code, "query": query, "limit": limit, "country": country}))
+
+
+def _point(value: Any, what: str) -> Any:
+    if isinstance(value, str) and value:
+        return value
+    if isinstance(value, dict) and set(value) == {"lat", "lon"}:
+        _latlon(value["lat"], value["lon"])
+        return value
+    raise InvalidRequestError(f"{what} must be an airport code or {{'lat': .., 'lon': ..}}")
+
+
+def airport_distance(origin: Any, destination: Any) -> Route:
+    return Route("POST", "/v1/aviation/distance", m.AirportDistance,
+                 {"from": _point(origin, "origin"), "to": _point(destination, "destination")})
+
+
+def space_weather() -> Route:
+    return Route("POST", "/v1/space/weather", m.SpaceWeather, {})
+
+
+def aurora(lat: float, lon: float) -> Route:
+    _latlon(lat, lon)
+    return Route("POST", "/v1/space/aurora", m.AuroraNowcast, {"lat": lat, "lon": lon})
+
+
+def asteroids(days: Optional[int], dist_max_au: Optional[float]) -> Route:
+    if days is not None and not 1 <= days <= 30:
+        raise InvalidRequestError("days must be between 1 and 30")
+    if dist_max_au is not None and not 0.0001 <= dist_max_au <= 0.2:
+        raise InvalidRequestError("dist_max_au must be between 0.0001 and 0.2")
+    return Route("POST", "/v1/space/asteroids", m.AsteroidApproaches,
+                 _drop_none({"days": days, "dist_max_au": dist_max_au}))
+
+
+_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def sun_moon(lat: float, lon: float, date: Optional[str], tz: Optional[str]) -> Route:
+    _latlon(lat, lon)
+    if date is not None and not _DATE.match(date):
+        raise InvalidRequestError("date must be YYYY-MM-DD")
+    if tz is not None:
+        _text(tz, "tz", 64)
+    return Route("POST", "/v1/space/sun-moon", m.SunMoon, _drop_none({"lat": lat, "lon": lon, "date": date, "tz": tz}))
+
+
+def satellite_passes(
+    lat: float,
+    lon: float,
+    alt_m: Optional[float],
+    norad_id: Optional[int],
+    days: Optional[int],
+    min_elevation: Optional[float],
+    visible_only: Optional[bool],
+) -> Route:
+    _latlon(lat, lon)
+    if alt_m is not None and not -500 <= alt_m <= 9000:
+        raise InvalidRequestError("alt_m must be between -500 and 9000")
+    if norad_id is not None and not 1 <= norad_id <= 999999999:
+        raise InvalidRequestError("norad_id must be a positive integer")
+    if days is not None and not 1 <= days <= 3:
+        raise InvalidRequestError("days must be between 1 and 3")
+    if min_elevation is not None and not 0 <= min_elevation <= 89:
+        raise InvalidRequestError("min_elevation must be between 0 and 89")
+    body = _drop_none({"lat": lat, "lon": lon, "alt_m": alt_m, "norad_id": norad_id, "days": days,
+                       "min_elevation": min_elevation, "visible_only": visible_only})
+    return Route("POST", "/v1/space/passes", m.SatellitePasses, body)
+
+
+# --- mlpeek ---------------------------------------------------------------
+
+_ML_MODELS = ("small-en", "multilingual")
+
+
+def _ml_model(model: Optional[str]) -> None:
+    if model is not None and model not in _ML_MODELS:
+        raise InvalidRequestError("model must be 'small-en' or 'multilingual'")
+
+
+def embed(
+    texts: Sequence[str], model: Optional[str], normalize: Optional[bool], encoding: Optional[str], input_type: Optional[str]
+) -> Route:
+    _ml_model(model)
+    if encoding is not None and encoding not in ("float", "base64"):
+        raise InvalidRequestError("encoding must be 'float' or 'base64'")
+    if input_type is not None and input_type not in ("none", "query", "passage"):
+        raise InvalidRequestError("input_type must be 'none', 'query' or 'passage'")
+    body = _drop_none({"texts": _strings(texts, "texts", 64, 8000), "model": model, "normalize": normalize,
+                       "encoding": encoding, "input_type": input_type})
+    return Route("POST", "/v1/embed", m.EmbedResult, body)
+
+
+def rerank(query: str, documents: Sequence[str], top_k: Optional[int]) -> Route:
+    if top_k is not None and not 1 <= top_k <= 100:
+        raise InvalidRequestError("top_k must be between 1 and 100")
+    body = _drop_none({"query": _text(query, "query", 2000), "documents": _strings(documents, "documents", 100, 4000), "top_k": top_k})
+    return Route("POST", "/v1/rerank", m.RerankResult, body)
+
+
+def similarity(a: Optional[str], b: Optional[str], pairs: Optional[Sequence[Any]], model: Optional[str]) -> Route:
+    _ml_model(model)
+    single = a is not None or b is not None
+    if single == (pairs is not None) or (single and (a is None or b is None)):
+        raise InvalidRequestError("give a and b together, or pairs")
+    body: dict[str, Any] = {}
+    if single:
+        body = {"a": _text(a, "a", 4000), "b": _text(b, "b", 4000)}
+    else:
+        assert pairs is not None
+        if isinstance(pairs, str) or not 1 <= len(pairs) <= 50:
+            raise InvalidRequestError("pairs must be a list of 1-50 (a, b) pairs")
+        out = []
+        for p in pairs:
+            if isinstance(p, dict):
+                pa, pb = p.get("a"), p.get("b")
+            else:
+                try:
+                    pa, pb = p
+                except (TypeError, ValueError):
+                    raise InvalidRequestError("each pair must be (a, b) or {'a': .., 'b': ..}") from None
+            out.append({"a": _text(pa, "pair a", 4000), "b": _text(pb, "pair b", 4000)})
+        body = {"pairs": out}
+    if model is not None:
+        body["model"] = model
+    return Route("POST", "/v1/similarity", m.SimilarityResult, body)
+
+
+def ner(text: str, labels: Optional[Sequence[str]]) -> Route:
+    if labels is not None and (isinstance(labels, str) or not 1 <= len(labels) <= 18):
+        raise InvalidRequestError("labels must be a list of 1-18 entity types")
+    body = _drop_none({"text": _text(text, "text", 20000), "labels": list(labels) if labels is not None else None})
+    return Route("POST", "/v1/ner", m.NerResult, body)
+
+
+def classify_zero_shot(
+    text: str, labels: Sequence[str], multi_label: Optional[bool], hypothesis_template: Optional[str]
+) -> Route:
+    if hypothesis_template is not None and (
+        hypothesis_template.count("{}") != 1 or not 2 <= len(hypothesis_template) <= 200
+    ):
+        raise InvalidRequestError("hypothesis_template must contain {} exactly once (2-200 characters)")
+    lab = _strings(labels, "labels", 10, 100)
+    if len(set(lab)) != len(lab):
+        raise InvalidRequestError("labels must be unique")
+    body = _drop_none({"text": _text(text, "text", 2000), "labels": lab, "multi_label": multi_label,
+                       "hypothesis_template": hypothesis_template})
+    return Route("POST", "/v1/classify/zero-shot", m.ZeroShotResult, body)
+
+
+# --- screening ------------------------------------------------------------
+
+
+def check_url(url: Optional[str], domain: Optional[str]) -> Route:
+    if (url is None) == (domain is None):
+        raise InvalidRequestError("give url or domain, not both")
+    body = {"url": _text(url, "url", 2048)} if url is not None else {"domain": _text(domain, "domain", 2048)}
+    return Route("POST", "/v1/check/url", m.UrlCheck, body)
+
+
+def check_urls(items: Sequence[str]) -> Route:
+    return Route("POST", "/v1/check/url/batch", m.UrlCheckBatch, {"items": _strings(items, "items", 1000, 2048)})
+
+
+_SANCTION_ADDR = re.compile(r"^[A-Za-z0-9:_.\-]{1,128}$")
+
+
+def sanctions_batch(addresses: Sequence[str]) -> Route:
+    addrs = _strings(addresses, "addresses", 1000, 128)
+    if any(not _SANCTION_ADDR.match(a) for a in addrs):
+        raise InvalidRequestError("addresses may only contain letters, digits and : _ . -")
+    return Route("POST", "/v1/sanctions/batch", m.SanctionsBatch, {"addresses": addrs})
+
+
 # --- agentscan ------------------------------------------------------------
 
 

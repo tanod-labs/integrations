@@ -481,6 +481,150 @@ export interface WeatherForecast extends Extra {
   attribution: Record<string, unknown>;
 }
 
+// --- skypeek --------------------------------------------------------------
+
+export interface MetarStation extends Extra {
+  station: string;
+  found: boolean;
+  raw?: string;
+  observed_at?: string | null;
+  issued_at?: string | null;
+  decoded?: Record<string, unknown>;
+}
+
+export interface MetarReport extends Extra {
+  kind?: string;
+  count: number;
+  found: number;
+  stations: MetarStation[];
+}
+
+export interface ReportDecode extends Extra {
+  kind: string;
+  decoded: Record<string, unknown>;
+  disclaimer?: string;
+  note?: string;
+}
+
+export interface AirportResult extends Extra {
+  count: number;
+  airports: Record<string, unknown>[];
+}
+
+export type GeoPoint = string | { lat: number; lon: number };
+
+export interface AirportDistance extends Extra {
+  from?: Record<string, unknown>;
+  to?: Record<string, unknown>;
+  distance_km: number;
+  distance_nm?: number;
+  distance_mi?: number;
+  initial_bearing_deg?: number;
+  final_bearing_deg?: number;
+  midpoint?: Record<string, unknown>;
+}
+
+export interface SpaceWeather extends Extra {
+  kp: Record<string, unknown>;
+  kp_forecast: unknown[];
+  solar_wind: Record<string, unknown>;
+  alerts: Record<string, unknown>[];
+}
+
+export interface AuroraNowcast extends Extra {
+  lat: number;
+  lon: number;
+  probability_pct?: number;
+  likelihood?: string;
+  kp?: Record<string, unknown>;
+}
+
+export interface AsteroidApproaches extends Extra {
+  days: number;
+  count: number;
+  total_matches?: number;
+  truncated?: boolean;
+  approaches: Record<string, unknown>[];
+}
+
+export interface SunMoon extends Extra {
+  lat: number;
+  lon: number;
+  date: string;
+  tz?: string;
+  sun: Record<string, unknown>;
+  moon: Record<string, unknown>;
+}
+
+export interface SatellitePasses extends Extra {
+  satellite: Record<string, unknown>;
+  count: number;
+  passes: Record<string, unknown>[];
+}
+
+// --- mlpeek ---------------------------------------------------------------
+
+export type MlModel = "small-en" | "multilingual";
+
+export interface MlModelInfo extends Extra {
+  id: string;
+  source: string;
+  license: string;
+  revision?: string;
+  alias?: string;
+}
+
+export interface EmbedResult extends Extra {
+  model: MlModelInfo;
+  dimensions: number;
+}
+
+export interface RerankResult extends Extra {
+  model: MlModelInfo;
+  results: Record<string, unknown>[];
+}
+
+export interface SimilarityResult extends Extra {
+  model: MlModelInfo;
+  similarity?: number;
+}
+
+export interface NerResult extends Extra {
+  model: MlModelInfo;
+  entities: Record<string, unknown>[];
+}
+
+export interface ZeroShotResult extends Extra {
+  model: MlModelInfo;
+  labels: Record<string, unknown>[];
+}
+
+// --- screening ------------------------------------------------------------
+
+export interface UrlCheck extends Extra {
+  input: string;
+  host: string;
+  listed: boolean;
+  matched_domain: string | null;
+  sources: string[];
+  shared_platform: boolean;
+  list_updated_at?: string;
+}
+
+export interface UrlCheckBatch extends Extra {
+  count: number;
+  listed_count: number;
+  results: Record<string, unknown>[];
+  list_updated_at?: string;
+}
+
+export interface SanctionsBatch extends Extra {
+  count: number;
+  matched_count: number;
+  results: Record<string, unknown>[];
+  disclaimer?: string;
+}
+
 // --- agentscan ------------------------------------------------------------
 
 export interface AgentRecord extends Extra {

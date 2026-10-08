@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from decimal import Decimal
-from typing import Any, Awaitable, Callable, Literal, Optional, Sequence
+from typing import Any, Awaitable, Callable, Literal, Optional, Sequence, Union
 
 from langchain_core.tools import BaseTool, StructuredTool, ToolException
 from pydantic import BaseModel, Field
@@ -192,6 +192,104 @@ class WeatherArgs(BaseModel):
     hours: Optional[int] = Field(default=None, ge=1, le=48, description="Hourly rows to return (1-48, default 24).")
 
 
+class StationsArgs(BaseModel):
+    stations: list[str] = Field(min_length=1, max_length=20, description="1-20 ICAO station identifiers, e.g. RPLL, KSFO.")
+    decode: Optional[bool] = Field(default=None, description="Also return each report decoded (default true).")
+
+
+class DecodeReportArgs(BaseModel):
+    raw: str = Field(min_length=1, max_length=2000, description="One METAR or TAF report as text.")
+    kind: Optional[Literal["auto", "metar", "taf"]] = Field(default=None, description="Report type (default auto).")
+
+
+class AirportArgs(BaseModel):
+    code: Optional[str] = Field(default=None, min_length=2, max_length=8, description="ICAO, IATA or ident, e.g. RPLL or MNL. Give code or query.")
+    query: Optional[str] = Field(default=None, min_length=2, max_length=100, description="Airport name or city. Give code or query.")
+    limit: Optional[int] = Field(default=None, ge=1, le=20, description="Most query results (default 5).")
+    country: Optional[str] = Field(default=None, min_length=2, max_length=2, description="ISO 3166-1 alpha-2 filter for query, e.g. PH.")
+
+
+class LatLonPoint(BaseModel):
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+
+
+class DistanceArgs(BaseModel):
+    origin: Union[str, LatLonPoint] = Field(description="Airport code (ICAO, IATA or ident) or {lat, lon}.")
+    destination: Union[str, LatLonPoint] = Field(description="Airport code (ICAO, IATA or ident) or {lat, lon}.")
+
+
+class AuroraArgs(BaseModel):
+    lat: float = Field(ge=-90, le=90, description="Latitude in degrees.")
+    lon: float = Field(ge=-180, le=180, description="Longitude in degrees.")
+
+
+class AsteroidArgs(BaseModel):
+    days: Optional[int] = Field(default=None, ge=1, le=30, description="Look-ahead window in days (default 7).")
+    dist_max_au: Optional[float] = Field(default=None, ge=0.0001, le=0.2, description="Largest nominal miss distance in au (default 0.05).")
+
+
+class SunMoonArgs(BaseModel):
+    lat: float = Field(ge=-90, le=90, description="Latitude in degrees.")
+    lon: float = Field(ge=-180, le=180, description="Longitude in degrees.")
+    date: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="Local date YYYY-MM-DD (default today).")
+    tz: Optional[str] = Field(default=None, min_length=1, max_length=64, description="IANA time zone, e.g. Asia/Manila (default UTC).")
+
+
+class PassesArgs(BaseModel):
+    lat: float = Field(ge=-90, le=90, description="Observer latitude.")
+    lon: float = Field(ge=-180, le=180, description="Observer longitude.")
+    alt_m: Optional[float] = Field(default=None, ge=-500, le=9000, description="Observer altitude in metres.")
+    norad_id: Optional[int] = Field(default=None, ge=1, description="NORAD catalog number (default 25544, the ISS).")
+    days: Optional[int] = Field(default=None, ge=1, le=3, description="Window in days (default 2).")
+    min_elevation: Optional[float] = Field(default=None, ge=0, le=89, description="Lowest elevation counted as a pass, degrees (default 10).")
+    visible_only: Optional[bool] = Field(default=None, description="Only passes visible to the eye.")
+
+
+class EmbedArgs(BaseModel):
+    texts: list[str] = Field(min_length=1, max_length=64, description="1-64 texts, each at most 8,000 characters.")
+    model: Optional[Literal["small-en", "multilingual"]] = Field(default=None, description="small-en (English, default) or multilingual.")
+    input_type: Optional[Literal["none", "query", "passage"]] = Field(default=None, description="Retrieval prefix (default none).")
+
+
+class RerankArgs(BaseModel):
+    query: str = Field(min_length=1, max_length=2000)
+    documents: list[str] = Field(min_length=1, max_length=100, description="1-100 documents, each at most 4,000 characters.")
+    top_k: Optional[int] = Field(default=None, ge=1, le=100, description="Keep the best k (default all, ranked).")
+
+
+class SimilarityArgs(BaseModel):
+    a: Optional[str] = Field(default=None, min_length=1, max_length=4000, description="First text of one pair (give with b).")
+    b: Optional[str] = Field(default=None, min_length=1, max_length=4000, description="Second text of one pair.")
+    pairs: Optional[list[dict[str, str]]] = Field(default=None, max_length=50, description="Alternative: 1-50 {a, b} pairs.")
+    model: Optional[Literal["small-en", "multilingual"]] = None
+
+
+class NerArgs(BaseModel):
+    text: str = Field(min_length=1, max_length=20000, description="English text.")
+    labels: Optional[list[str]] = Field(default=None, min_length=1, max_length=18, description="Only these OntoNotes types, e.g. PERSON, ORG, GPE, MONEY (default all 18).")
+
+
+class ZeroShotArgs(BaseModel):
+    text: str = Field(min_length=1, max_length=2000, description="English text.")
+    labels: list[str] = Field(min_length=1, max_length=10, description="1-10 unique candidate labels.")
+    multi_label: Optional[bool] = Field(default=None, description="Score each label independently.")
+    hypothesis_template: Optional[str] = Field(default=None, min_length=2, max_length=200, description="Must contain {} exactly once.")
+
+
+class CheckUrlArgs(BaseModel):
+    url: Optional[str] = Field(default=None, min_length=1, max_length=2048, description="URL or host to screen (parsed, never fetched). Give url or domain.")
+    domain: Optional[str] = Field(default=None, min_length=1, max_length=2048, description="Domain or host name.")
+
+
+class CheckUrlsArgs(BaseModel):
+    items: list[str] = Field(min_length=1, max_length=1000, description="1-1,000 URLs, hosts or domains.")
+
+
+class SanctionsBatchArgs(BaseModel):
+    addresses: list[str] = Field(min_length=1, max_length=1000, description="1-1,000 crypto addresses (EVM, bech32, BTC, TRX, ...).")
+
+
 class NoArgs(BaseModel):
     pass
 
@@ -233,6 +331,10 @@ class _Spec:
     method: str
     to_kwargs: Callable[[dict[str, Any]], tuple[tuple[Any, ...], dict[str, Any]]]
     default: bool = True
+
+
+def _pt(v: Any) -> Any:
+    return v if isinstance(v, str) else (v.model_dump() if hasattr(v, "model_dump") else dict(v))
 
 
 def _kw(d: dict[str, Any]) -> tuple[tuple[Any, ...], dict[str, Any]]:
@@ -514,6 +616,150 @@ SPECS: list[_Spec] = [
         WeatherArgs,
         "weather",
         lambda d: ((d.get("lat"), d.get("lon")), {"place": d.get("place"), "hours": d.get("hours")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_get_metar",
+        "skypeek: current METAR weather reports for 1-20 airports (ICAO), decoded by default. Price USD 0.001 (5 free skypeek calls/IP/day, one pool). " + UNTRUSTED + "",
+        StationsArgs,
+        "aviation_metar",
+        lambda d: ((d["stations"],), {"decode": d.get("decode")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_get_taf",
+        "skypeek: current TAF forecasts for 1-20 airports (ICAO). Price USD 0.001 (shares the 5 free skypeek calls/day). " + UNTRUSTED + "",
+        StationsArgs,
+        "aviation_taf",
+        lambda d: ((d["stations"],), {"decode": d.get("decode")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_decode_metar_taf",
+        "skypeek: decode one pasted METAR or TAF report into wind, visibility, clouds, temperatures and flight category. Price USD 0.001 (shares the 5 free skypeek calls/day). " + UNTRUSTED + "",
+        DecodeReportArgs,
+        "decode_report",
+        lambda d: ((d["raw"],), {"kind": d.get("kind")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_lookup_airport",
+        "skypeek: airport by ICAO/IATA code, or search by name or city. Price USD 0.001 (shares the 5 free skypeek calls/day). " + UNTRUSTED + "",
+        AirportArgs,
+        "airport_lookup",
+        lambda d: ((d.get("code"),), {k: d.get(k) for k in ("query", "limit", "country")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_airport_distance",
+        "skypeek: great-circle distance, bearings and midpoint between two airports or points. Price USD 0.001 (shares the 5 free skypeek calls/day). " + UNTRUSTED + "",
+        DistanceArgs,
+        "airport_distance",
+        lambda d: ((_pt(d["origin"]), _pt(d["destination"])), {}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_get_space_weather",
+        "skypeek: space weather: Kp index and forecast, solar wind and NOAA alerts. Price USD 0.001 (shares the 5 free skypeek calls/day). " + UNTRUSTED + "",
+        NoArgs,
+        "space_weather",
+        lambda d: ((), {}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_aurora_forecast",
+        "skypeek: aurora nowcast probability at a location. Price USD 0.001 (shares the 5 free skypeek calls/day). " + UNTRUSTED + "",
+        AuroraArgs,
+        "aurora",
+        lambda d: ((d["lat"], d["lon"]), {}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_asteroid_close_approaches",
+        "skypeek: asteroid and comet close approaches to Earth in the next 1-30 days. Price USD 0.001 (shares the 5 free skypeek calls/day). " + UNTRUSTED + "",
+        AsteroidArgs,
+        "asteroids",
+        lambda d: ((), {"days": d.get("days"), "dist_max_au": d.get("dist_max_au")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_sun_moon_times",
+        "skypeek: sunrise, sunset, moonrise, moonset and moon phase for a place and date. Price USD 0.001 (shares the 5 free skypeek calls/day). " + UNTRUSTED + "",
+        SunMoonArgs,
+        "sun_moon",
+        lambda d: ((d["lat"], d["lon"]), {"date": d.get("date"), "tz": d.get("tz")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_satellite_passes",
+        "skypeek: pass predictions for the ISS (default) or another supported satellite over a location. Price USD 0.002 (shares the 5 free skypeek calls/day). " + UNTRUSTED + "",
+        PassesArgs,
+        "satellite_passes",
+        lambda d: ((d["lat"], d["lon"]), {k: d.get(k) for k in ("alt_m", "norad_id", "days", "min_elevation", "visible_only")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_embed_texts",
+        "mlpeek: 384-dimension embeddings of 1-64 texts (English or multilingual). Price USD 0.0005 per text, at least USD 0.001 per call (5 free mlpeek calls/IP/day, one pool). " + UNTRUSTED + "",
+        EmbedArgs,
+        "embed",
+        lambda d: ((d["texts"],), {"model": d.get("model"), "input_type": d.get("input_type")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_rerank_documents",
+        "mlpeek: rerank up to 100 documents against a query with a cross-encoder. Price USD 0.002 per call (shares the 5 free mlpeek calls/day). " + UNTRUSTED + "",
+        RerankArgs,
+        "rerank",
+        lambda d: ((d["query"], d["documents"]), {"top_k": d.get("top_k")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_text_similarity",
+        "mlpeek: cosine similarity of one text pair (a, b) or up to 50 pairs. Price USD 0.0005 per pair, at least USD 0.001 per call (shares the 5 free mlpeek calls/day). " + UNTRUSTED + "",
+        SimilarityArgs,
+        "similarity",
+        lambda d: ((d.get("a"), d.get("b")), {"pairs": d.get("pairs"), "model": d.get("model")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_extract_entities",
+        "mlpeek: named entities (people, organisations, places, dates, money, ...) in English text. Price USD 0.001 (shares the 5 free mlpeek calls/day). " + UNTRUSTED + "",
+        NerArgs,
+        "ner",
+        lambda d: ((d["text"],), {"labels": d.get("labels")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_classify_zero_shot",
+        "mlpeek: classify English text into 1-10 labels you supply, with no training. Price USD 0.001 (shares the 5 free mlpeek calls/day). " + UNTRUSTED + "",
+        ZeroShotArgs,
+        "classify_zero_shot",
+        lambda d: ((d["text"], d["labels"]), {"multi_label": d.get("multi_label"), "hypothesis_template": d.get("hypothesis_template")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_check_url",
+        "screening: is a URL or domain on two public phishing/scam domain lists? The URL is only parsed, never fetched; not listed does not mean safe. Price USD 0.001 (shares the 10 free chain reads/IP/day). " + UNTRUSTED + "",
+        CheckUrlArgs,
+        "check_url",
+        lambda d: ((d.get("url"),), {"domain": d.get("domain")}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_check_urls",
+        "screening: the phishing/scam list check for 1-1,000 URLs or domains in one call. Not listed does not mean safe. Price USD 0.0002 per item, at least USD 0.001 per call; no free tier. " + UNTRUSTED + "",
+        CheckUrlsArgs,
+        "check_urls",
+        lambda d: ((d["items"],), {}),
+        default=False,
+    ),
+    _Spec(
+        "tanod_check_sanctions_batch",
+        "screening: US OFAC SDN digital-currency-address check for 1-1,000 crypto addresses in one call. A screening aid, not legal advice. Price USD 0.0005 per address, at least USD 0.002 per call; no free tier. " + UNTRUSTED + "",
+        SanctionsBatchArgs,
+        "sanctions_batch",
+        lambda d: ((d["addresses"],), {}),
         default=False,
     ),
 ]

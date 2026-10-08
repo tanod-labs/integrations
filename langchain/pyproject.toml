@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "langchain-tanod"
-version = "0.1.0"
+version = "0.2.0"
 description = "LangChain tools for Tanod: address risk checks, smart-contract scans, MCP/skill package scans, web/DNS/chain reads for AI agents. Pay per call with x402 (USDC on Base); free daily tier, no signup."
 readme = "README.md"
 license = "MIT"
@@ -20,13 +20,13 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "tanod>=0.1.0,<0.2",
+  "tanod>=0.2.0,<0.3",
   "langchain-core>=0.3.0,<2",
 ]
 
 [project.optional-dependencies]
-wallet = ["tanod[wallet]>=0.1.0,<0.2"]
-dev = ["pytest>=8", "tanod[wallet]>=0.1.0,<0.2"]
+wallet = ["tanod[wallet]>=0.2.0,<0.3"]
+dev = ["pytest>=8", "tanod[wallet]>=0.2.0,<0.3"]
 
 [project.urls]
 Homepage = "https://tanod.dev"

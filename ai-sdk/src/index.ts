@@ -112,6 +112,24 @@ export const TOOL_NAMES = [
   "tanod_get_swap_quote",
   "tanod_web_search",
   "tanod_get_weather",
+  "tanod_get_metar",
+  "tanod_get_taf",
+  "tanod_decode_metar_taf",
+  "tanod_lookup_airport",
+  "tanod_airport_distance",
+  "tanod_get_space_weather",
+  "tanod_aurora_forecast",
+  "tanod_asteroid_close_approaches",
+  "tanod_sun_moon_times",
+  "tanod_satellite_passes",
+  "tanod_embed_texts",
+  "tanod_rerank_documents",
+  "tanod_text_similarity",
+  "tanod_extract_entities",
+  "tanod_classify_zero_shot",
+  "tanod_check_url",
+  "tanod_check_urls",
+  "tanod_check_sanctions_batch",
   "tanod_agents_summary",
   "tanod_agents_query",
   "tanod_agents_history",
@@ -380,6 +398,114 @@ function buildAll(c: Tanod): TanodTools {
         hours: z.number().int().min(1).max(48).optional().describe("Hourly rows to return (default 24)."),
       }),
       execute: (q) => run(c, () => c.weather(q)),
+    }),
+    tanod_get_metar: tool({
+      description:
+        "skypeek: current METAR weather reports for 1-20 airports (ICAO), decoded by default. Price USD 0.001 (5 free skypeek calls/IP/day, one pool). " + UNTRUSTED,
+      inputSchema: z.object({ stations: z.array(z.string().min(1).max(16)).min(1).max(20).describe("ICAO identifiers, e.g. RPLL, KSFO."), decode: z.boolean().optional() }),
+      execute: ({ stations, decode }) => run(c, () => c.aviationMetar(stations, { decode })),
+    }),
+    tanod_get_taf: tool({
+      description:
+        "skypeek: current TAF forecasts for 1-20 airports (ICAO). Price USD 0.001 (shares the 5 free skypeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ stations: z.array(z.string().min(1).max(16)).min(1).max(20).describe("ICAO identifiers, e.g. RPLL, KSFO."), decode: z.boolean().optional() }),
+      execute: ({ stations, decode }) => run(c, () => c.aviationTaf(stations, { decode })),
+    }),
+    tanod_decode_metar_taf: tool({
+      description:
+        "skypeek: decode one pasted METAR or TAF report into wind, visibility, clouds, temperatures and flight category. Price USD 0.001 (shares the 5 free skypeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ raw: z.string().min(1).max(2000), kind: z.enum(["auto", "metar", "taf"]).optional() }),
+      execute: ({ raw, kind }) => run(c, () => c.decodeReport(raw, { kind })),
+    }),
+    tanod_lookup_airport: tool({
+      description:
+        "skypeek: airport by ICAO/IATA code, or search by name or city. Give code or query. Price USD 0.001 (shares the 5 free skypeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ code: z.string().min(2).max(8).optional().describe("ICAO, IATA or ident, e.g. RPLL or MNL."), query: z.string().min(2).max(100).optional().describe("Airport name or city."), limit: z.number().int().min(1).max(20).optional(), country: z.string().length(2).optional().describe("ISO 3166-1 alpha-2 filter for query, e.g. PH.") }),
+      execute: (q) => run(c, () => c.airportLookup(q)),
+    }),
+    tanod_airport_distance: tool({
+      description:
+        "skypeek: great-circle distance, bearings and midpoint between two airports or points. Price USD 0.001 (shares the 5 free skypeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ origin: z.union([z.string().min(1), z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) })]).describe("Airport code or {lat, lon}."), destination: z.union([z.string().min(1), z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) })]).describe("Airport code or {lat, lon}.") }),
+      execute: ({ origin, destination }) => run(c, () => c.airportDistance(origin, destination)),
+    }),
+    tanod_get_space_weather: tool({
+      description:
+        "skypeek: space weather: Kp index and forecast, solar wind and NOAA alerts. Price USD 0.001 (shares the 5 free skypeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({}),
+      execute: () => run(c, () => c.spaceWeather()),
+    }),
+    tanod_aurora_forecast: tool({
+      description:
+        "skypeek: aurora nowcast probability at a location. Price USD 0.001 (shares the 5 free skypeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }),
+      execute: ({ lat, lon }) => run(c, () => c.aurora(lat, lon)),
+    }),
+    tanod_asteroid_close_approaches: tool({
+      description:
+        "skypeek: asteroid and comet close approaches to Earth in the next 1-30 days. Price USD 0.001 (shares the 5 free skypeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ days: z.number().int().min(1).max(30).optional(), dist_max_au: z.number().min(0.0001).max(0.2).optional().describe("Largest nominal miss distance in au (default 0.05).") }),
+      execute: ({ days, dist_max_au }) => run(c, () => c.asteroids({ days, distMaxAu: dist_max_au })),
+    }),
+    tanod_sun_moon_times: tool({
+      description:
+        "skypeek: sunrise, sunset, moonrise, moonset and moon phase for a place and date. Price USD 0.001 (shares the 5 free skypeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Local date YYYY-MM-DD (default today)."), tz: z.string().min(1).max(64).optional().describe("IANA time zone, e.g. Asia/Manila (default UTC).") }),
+      execute: ({ lat, lon, date, tz }) => run(c, () => c.sunMoon(lat, lon, { date, tz })),
+    }),
+    tanod_satellite_passes: tool({
+      description:
+        "skypeek: pass predictions for the ISS (default) or another supported satellite over a location. Price USD 0.002 (shares the 5 free skypeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180), alt_m: z.number().min(-500).max(9000).optional(), norad_id: z.number().int().min(1).optional().describe("NORAD number (default 25544, the ISS)."), days: z.number().int().min(1).max(3).optional(), min_elevation: z.number().min(0).max(89).optional(), visible_only: z.boolean().optional() }),
+      execute: ({ lat, lon, alt_m, norad_id, days, min_elevation, visible_only }) => run(c, () => c.satellitePasses(lat, lon, { altM: alt_m, noradId: norad_id, days, minElevation: min_elevation, visibleOnly: visible_only })),
+    }),
+    tanod_embed_texts: tool({
+      description:
+        "mlpeek: 384-dimension embeddings of 1-64 texts (English or multilingual). Price USD 0.0005 per text, at least USD 0.001 per call (5 free mlpeek calls/IP/day, one pool). " + UNTRUSTED,
+      inputSchema: z.object({ texts: z.array(z.string().min(1).max(8000)).min(1).max(64), model: z.enum(["small-en", "multilingual"]).optional(), input_type: z.enum(["none", "query", "passage"]).optional() }),
+      execute: ({ texts, model, input_type }) => run(c, () => c.embed(texts, { model, inputType: input_type })),
+    }),
+    tanod_rerank_documents: tool({
+      description:
+        "mlpeek: rerank up to 100 documents against a query with a cross-encoder. Price USD 0.002 per call (shares the 5 free mlpeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ query: z.string().min(1).max(2000), documents: z.array(z.string().min(1).max(4000)).min(1).max(100), top_k: z.number().int().min(1).max(100).optional() }),
+      execute: ({ query, documents, top_k }) => run(c, () => c.rerank(query, documents, { topK: top_k })),
+    }),
+    tanod_text_similarity: tool({
+      description:
+        "mlpeek: cosine similarity of one text pair (a, b) or up to 50 pairs. Price USD 0.0005 per pair, at least USD 0.001 per call (shares the 5 free mlpeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ a: z.string().min(1).max(4000).optional(), b: z.string().min(1).max(4000).optional(), pairs: z.array(z.object({ a: z.string().min(1).max(4000), b: z.string().min(1).max(4000) })).min(1).max(50).optional(), model: z.enum(["small-en", "multilingual"]).optional() }),
+      execute: (q) => run(c, () => c.similarity(q)),
+    }),
+    tanod_extract_entities: tool({
+      description:
+        "mlpeek: named entities (people, organisations, places, dates, money, ...) in English text. Price USD 0.001 (shares the 5 free mlpeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ text: z.string().min(1).max(20000), labels: z.array(z.string()).min(1).max(18).optional().describe("Only these OntoNotes types, e.g. PERSON, ORG, GPE (default all 18).") }),
+      execute: ({ text, labels }) => run(c, () => c.ner(text, { labels })),
+    }),
+    tanod_classify_zero_shot: tool({
+      description:
+        "mlpeek: classify English text into 1-10 labels you supply, with no training. Price USD 0.001 (shares the 5 free mlpeek calls/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ text: z.string().min(1).max(2000), labels: z.array(z.string().min(1).max(100)).min(1).max(10), multi_label: z.boolean().optional(), hypothesis_template: z.string().min(2).max(200).optional().describe("Must contain {} exactly once.") }),
+      execute: ({ text, labels, multi_label, hypothesis_template }) => run(c, () => c.classifyZeroShot(text, labels, { multiLabel: multi_label, hypothesisTemplate: hypothesis_template })),
+    }),
+    tanod_check_url: tool({
+      description:
+        "screening: is a URL or domain on two public phishing/scam domain lists? The URL is only parsed, never fetched; not listed does not mean safe. Price USD 0.001 (shares the 10 free chain reads/IP/day). " + UNTRUSTED,
+      inputSchema: z.object({ url: z.string().min(1).max(2048).optional().describe("URL or host. Give url or domain."), domain: z.string().min(1).max(2048).optional() }),
+      execute: (q) => run(c, () => c.checkUrl(q)),
+    }),
+    tanod_check_urls: tool({
+      description:
+        "screening: the phishing/scam list check for 1-1,000 URLs or domains in one call. Not listed does not mean safe. Price USD 0.0002 per item, at least USD 0.001 per call; no free tier. " + UNTRUSTED,
+      inputSchema: z.object({ items: z.array(z.string().min(1).max(2048)).min(1).max(1000) }),
+      execute: ({ items }) => run(c, () => c.checkUrls(items)),
+    }),
+    tanod_check_sanctions_batch: tool({
+      description:
+        "screening: US OFAC SDN digital-currency-address check for 1-1,000 crypto addresses in one call. A screening aid, not legal advice. Price USD 0.0005 per address, at least USD 0.002 per call; no free tier. " + UNTRUSTED,
+      inputSchema: z.object({ addresses: z.array(z.string().min(1).max(128)).min(1).max(1000) }),
+      execute: ({ addresses }) => run(c, () => c.sanctionsBatch(addresses)),
     }),
     tanod_agents_summary: tool({
       description:
