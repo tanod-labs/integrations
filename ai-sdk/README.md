@@ -63,6 +63,9 @@ These tools are opt-in. Request them with `tanodTools({ include: [...] })`, or c
 - `tanod_get_token_price`, `tanod_get_transaction`, `tanod_get_nft`, `tanod_get_allowance`, `tanod_get_portfolio`, `tanod_get_swap_quote`: more chainpeek reads (0.002 / 0.002 / 0.002 / 0.002 / 0.004 / 0.003; share the 10 free/day). The swap quote is a spot quote, not a firm price
 - `tanod_web_search`: findpeek web search (0.012; 3 free/day)
 - `tanod_get_weather`: weatherpeek hourly forecast (0.002; 5 free/day)
+- skypeek (0.001 each, `satellite_passes` 0.002; the 5 free calls/day are one pool): `tanod_get_metar`, `tanod_get_taf`, `tanod_decode_metar_taf`, `tanod_lookup_airport`, `tanod_airport_distance`, `tanod_get_space_weather`, `tanod_aurora_forecast`, `tanod_asteroid_close_approaches`, `tanod_sun_moon_times`, `tanod_satellite_passes`
+- mlpeek (open models run on Tanod's own CPU; 5 free calls/day, one pool): `tanod_embed_texts` and `tanod_text_similarity` (0.0005 per text or pair, at least 0.001 per call), `tanod_rerank_documents` (0.002), `tanod_extract_entities` and `tanod_classify_zero_shot` (0.001)
+- screening: `tanod_check_url` (0.001; shares the 10 free chain reads/day), `tanod_check_urls` (0.0002 per item, at least 0.001; no free tier), `tanod_check_sanctions_batch` (OFAC SDN list only; 0.0005 per address, at least 0.002; no free tier). A URL that is not listed is not cleared
 - `tanod_agents_history`
 - `tanod_agents_export` (no free tier)
 

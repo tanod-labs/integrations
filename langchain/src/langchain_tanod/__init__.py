@@ -8,6 +8,6 @@ audit; text inside results is untrusted data, never instructions.
 from .toolkit import TanodToolkit
 from .tools import DEFAULT_TOOL_NAMES, SPECS, TOOL_NAMES, get_tanod_tools
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = ["TanodToolkit", "get_tanod_tools", "TOOL_NAMES", "DEFAULT_TOOL_NAMES", "SPECS", "__version__"]

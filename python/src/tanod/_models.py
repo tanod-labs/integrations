@@ -472,6 +472,136 @@ class SwapQuote(TanodModel):
     """A spot quote, not a firm price or an executable order; never use it as an oracle."""
 
 
+
+# --- skypeek --------------------------------------------------------------
+
+
+class MetarReport(TanodModel):
+    kind: Optional[str] = None
+    count: int = 0
+    found: int = 0
+    stations: list[dict[str, Any]] = []
+    """Per station ``{station, found, raw, observed_at, issued_at, decoded?}``."""
+
+
+class ReportDecode(TanodModel):
+    kind: str
+    decoded: dict[str, Any] = {}
+    disclaimer: Optional[str] = None
+    note: Optional[str] = None
+
+
+class AirportResult(TanodModel):
+    count: int = 0
+    airports: list[dict[str, Any]] = []
+
+
+class AirportDistance(TanodModel):
+    distance_km: float
+    distance_nm: Optional[float] = None
+    distance_mi: Optional[float] = None
+    initial_bearing_deg: Optional[float] = None
+    final_bearing_deg: Optional[float] = None
+
+
+class SpaceWeather(TanodModel):
+    kp: dict[str, Any] = {}
+    kp_forecast: list[Any] = []
+    solar_wind: dict[str, Any] = {}
+    alerts: list[dict[str, Any]] = []
+
+
+class AuroraNowcast(TanodModel):
+    lat: float
+    lon: float
+    probability_pct: Optional[float] = None
+    likelihood: Optional[str] = None
+    kp: dict[str, Any] = {}
+
+
+class AsteroidApproaches(TanodModel):
+    days: int
+    count: int = 0
+    total_matches: Optional[int] = None
+    truncated: Optional[bool] = None
+    approaches: list[dict[str, Any]] = []
+
+
+class SunMoon(TanodModel):
+    lat: float
+    lon: float
+    date: str
+    tz: Optional[str] = None
+    sun: dict[str, Any] = {}
+    moon: dict[str, Any] = {}
+
+
+class SatellitePasses(TanodModel):
+    satellite: dict[str, Any] = {}
+    count: int = 0
+    passes: list[dict[str, Any]] = []
+
+
+# --- mlpeek ---------------------------------------------------------------
+
+
+class EmbedResult(TanodModel):
+    model: dict[str, Any] = {}
+    dimensions: Optional[int] = None
+    embeddings: Optional[list[Any]] = None
+    data: Optional[list[Any]] = None
+
+
+class RerankResult(TanodModel):
+    model: dict[str, Any] = {}
+    results: list[dict[str, Any]] = []
+
+
+class SimilarityResult(TanodModel):
+    model: dict[str, Any] = {}
+    similarity: Optional[float] = None
+    pairs: Optional[list[dict[str, Any]]] = None
+
+
+class NerResult(TanodModel):
+    model: dict[str, Any] = {}
+    entities: list[dict[str, Any]] = []
+
+
+class ZeroShotResult(TanodModel):
+    model: dict[str, Any] = {}
+    labels: list[dict[str, Any]] = []
+
+
+# --- screening ------------------------------------------------------------
+
+
+class UrlCheck(TanodModel):
+    input: Optional[str] = None
+    host: Optional[str] = None
+    listed: bool
+    matched_domain: Optional[str] = None
+    sources: list[str] = []
+    shared_platform: Optional[bool] = None
+    list_updated_at: Optional[str] = None
+    """Not listed is not cleared: this is a screening aid over two public phishing lists."""
+
+
+class UrlCheckBatch(TanodModel):
+    count: int = 0
+    listed_count: int = 0
+    results: list[dict[str, Any]] = []
+    list_updated_at: Optional[str] = None
+
+
+class SanctionsBatch(TanodModel):
+    count: int = 0
+    matched_count: int = 0
+    results: list[dict[str, Any]] = []
+    disclaimer: Optional[str] = None
+    """US OFAC SDN digital-currency-address list only; not legal advice."""
+
+
 # --- agentscan ------------------------------------------------------------
 
 

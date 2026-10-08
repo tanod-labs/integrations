@@ -2,7 +2,7 @@
 
 TypeScript client for [Tanod](https://tanod.dev): pay-per-call security and utility tools for AI
 agents. No signup and no API key. You pay per call in USDC on Base with
-[x402](https://x402.org), and every tool has a free daily tier (except the bulk exports).
+[x402](https://x402.org), and every tool has a free daily tier (except the bulk exports and the URL and sanctions batches).
 Payments use the official x402 client packages, [`@x402/fetch`](https://www.npmjs.com/package/@x402/fetch)
 and [`@x402/evm`](https://www.npmjs.com/package/@x402/evm).
 
@@ -20,6 +20,9 @@ and [`@x402/evm`](https://www.npmjs.com/package/@x402/evm).
 | chainpeek: Chainlink price, transaction, NFT, allowance, portfolio, Uniswap V3 spot quote | `tokenPrice`, `transaction`, `nft`, `allowance`, `portfolio`, `swapQuote` | 0.002 / 0.002 / 0.002 / 0.002 / 0.004 / 0.003 | shares the 10 |
 | **findpeek**: web search | `webSearch` | 0.012 | 3 |
 | **weatherpeek**: hourly forecast | `weather` | 0.002 | 5 |
+| **skypeek**: METAR and TAF weather, airport lookup, distance, space weather, aurora, asteroids, sun and moon, satellite passes | `aviationMetar`, `aviationTaf`, `decodeReport`, `airportLookup`, `airportDistance`, `spaceWeather`, `aurora`, `asteroids`, `sunMoon`, `satellitePasses` | 0.001 each (`satellitePasses` 0.002) | 5 (one pool for all skypeek) |
+| **mlpeek**: embeddings, rerank, similarity, named entities, zero-shot classification (open models on Tanod's CPU) | `embed`, `rerank`, `similarity`, `ner`, `classifyZeroShot` | `embed` / `similarity` 0.0005 per text / pair, at least 0.001 per call; `rerank` 0.002; `ner` / `classifyZeroShot` 0.001 | 5 (one pool for all mlpeek) |
+| **screening**: phishing/scam list check for URLs, OFAC SDN check for crypto addresses | `checkUrl`, `checkUrls`, `sanctionsBatch` | `checkUrl` 0.001; `checkUrls` 0.0002 per item (at least 0.001); `sanctionsBatch` 0.0005 per address (at least 0.002) | `checkUrl` shares the 10 chain reads; batches have none |
 | **agentscan**: index of x402 endpoints and MCP servers | `agentsSummary` (free), `agentsQuery`, `agentsHistory`, `agentsExport`/`agentsExportCsv`, `agentsBulk` | free / 0.02 / 0.05 / 0.25 / 2.00 | unlimited / 10 / 5 / none / none |
 | Stored reports, health | `getReport`, `getReportMarkdown`, `health` | free | n/a |
 
