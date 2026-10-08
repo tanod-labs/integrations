@@ -167,3 +167,9 @@ twine check dist-py/* && twine upload dist-py/tanod-* && twine upload dist-py/la
   - `vitest` 5.0.3
 - **MCP bridge:** `mcp-remote` 0.14.3 (`punkpeye/mcp-remote`), used only in the Claude Desktop
   stdio snippet.
+
+
+## Claude Code plugin and agent skills
+
+- Plugin marketplace (one plugin per focused MCP server): `/plugin marketplace add tanod-labs/tanod-mcp`, then `/plugin install tanod-security@tanod` (or tanod-chain, tanod-sky, tanod-finance, tanod-docs, tanod-images, tanod-text, tanod-util, tanod-web, tanod-ml, tanod-agents, or `tanod` for all). See [tanod-labs/tanod-mcp](https://github.com/tanod-labs/tanod-mcp).
+- Agent skills (`SKILL.md`): `npx skills add tanod-labs/skills` installs seven skills that tell an agent when and how to use the address risk check, package scan, phishing and sanctions checks, hidden-Unicode detection, screenshots and outside monitoring. See [tanod-labs/skills](https://github.com/tanod-labs/skills).
