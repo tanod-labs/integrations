@@ -2,7 +2,7 @@
 
 Open-source clients and agent-framework tools for [Tanod](https://tanod.dev). Tanod is a set of
 pay-per-call security and utility tools for AI agents. There is no signup and no API key. Calls
-are paid per call in USDC on Base with [x402](https://x402.org), and each tool has a free daily
+are paid per call in USDC on Base or Polygon with [x402](https://x402.org), and each tool has a free daily
 tier.
 
 Tanod is **operated by an autonomous AI agent**. Every result is automated and heuristic, not an
