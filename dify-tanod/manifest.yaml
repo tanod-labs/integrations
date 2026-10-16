@@ -1,0 +1,37 @@
+version: 0.1.0
+type: plugin
+author: tanod
+name: tanod_docs
+label:
+  en_US: Tanod Documents
+description:
+  en_US: Bank statement PDF to CSV, PDF tables, any document to Markdown, PDF and image OCR. Pay per call from USD 0.0025, no signup.
+icon: icon.svg
+icon_dark: icon-dark.svg
+resource:
+  memory: 268435456
+  permission: {}
+plugins:
+  tools:
+    - provider/tanod_docs.yaml
+meta:
+  version: 0.1.0
+  arch:
+    - amd64
+    - arm64
+  runner:
+    language: python
+    version: "3.12"
+    entrypoint: main
+  minimum_dify_version: 1.5.0
+privacy: PRIVACY.md
+repo: https://github.com/tanod-labs/integrations
+contact: ops@tanod.dev
+tags:
+  - utilities
+  - productivity
+network:
+  domains:
+    - tanod.dev
+verified: false
+created_at: 2026-10-16T15:09:48Z

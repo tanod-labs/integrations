@@ -1,0 +1,42 @@
+identity:
+  author: tanod
+  name: tanod_docs
+  label:
+    en_US: Tanod Documents
+  description:
+    en_US: Bank statements to CSV, PDF tables, any document to Markdown, and OCR. Pay per call from USD 0.0025; no signup.
+  icon: icon.svg
+  tags:
+  - productivity
+  - utilities
+credentials_for_provider:
+  wallet_private_key:
+    type: secret-input
+    required: false
+    label:
+      en_US: Base wallet private key (optional)
+    placeholder:
+      en_US: 0x... (leave empty to pay nothing)
+    help:
+      en_US: 'Optional. Private key of a dedicated Base wallet holding a little USDC, used to pay Tanod per call. Leave empty to pay nothing: the tools then return the price instead of running (image OCR
+        has a small free daily allowance). Use a throwaway wallet with a small balance, never your main one.'
+    url: https://tanod.dev/payments/
+  max_price_usd:
+    type: text-input
+    required: false
+    default: '0.05'
+    label:
+      en_US: Max price per call (USD)
+    placeholder:
+      en_US: '0.05'
+    help:
+      en_US: Refuse any call that costs more than this many USD. Current prices are 0.0025 to 0.02.
+tools:
+- tools/bank_statement.yaml
+- tools/pdf_tables.yaml
+- tools/doc_to_markdown.yaml
+- tools/pdf_ocr.yaml
+- tools/image_ocr.yaml
+extra:
+  python:
+    source: provider/tanod_docs.py
