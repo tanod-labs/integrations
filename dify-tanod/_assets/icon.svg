@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Tanod">
+  <rect width="256" height="256" rx="48" fill="#12324a"/>
+  <path d="M128 34 206 62v62c0 48-32 80-78 98-46-18-78-50-78-98V62z" fill="none" stroke="#f2b84b" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M92 94h72M128 94v72" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>
+</svg>

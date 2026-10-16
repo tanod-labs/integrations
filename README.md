@@ -16,6 +16,7 @@ licensed.
 | LangChain tools | [`langchain/`](langchain) | PyPI `langchain-tanod` | `StructuredTool` per route, plus `TanodToolkit` and `get_tanod_tools()`. |
 | Vercel AI SDK tools | [`ai-sdk/`](ai-sdk) | npm `@tanod-labs/ai-sdk` | `tool()` definitions with zod schemas. Works with `ai` 5, 6 and 7. |
 | MCP client configs | [`mcp-configs/`](mcp-configs) | none | Configs for Claude Code, Claude Desktop, Cursor, Windsurf, VS Code and a generic client, all pointing at `https://tanod.dev/mcp`. |
+| Dify plugin | [`dify-tanod/`](dify-tanod) | none | Tool plugin: Tanod document, PDF, OCR, web and pre-action check tools as Dify tools. Free daily tier, optional x402 wallet. |
 | n8n design note | [`n8n/DESIGN.md`](n8n/DESIGN.md) | none | Plan for a community node. Not built yet. |
 
 The routes, prices and free tiers come from `https://tanod.dev/openapi.json`, `/llms.txt` and
