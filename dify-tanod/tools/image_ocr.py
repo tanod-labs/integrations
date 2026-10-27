@@ -1,13 +1,14 @@
 from collections.abc import Generator
 from typing import Any
 
+from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
 from utils.base import TanodTool
 from utils.tanod import TanodError
 
 
-class ImageOcrTool(TanodTool):
+class ImageOcrTool(TanodTool, Tool):
     def run(self, params: dict[str, Any]) -> Generator[ToolInvokeMessage]:
         url = (params.get("url") or "").strip()
         file = params.get("file")

@@ -1,6 +1,7 @@
 from collections.abc import Generator
 from typing import Any
 
+from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
 from utils.base import TanodTool
@@ -18,7 +19,7 @@ def _md(header, rows) -> str:
     return "\n".join([line(head), "| " + " | ".join(["---"] * cols) + " |"] + [line(r) for r in rows])
 
 
-class PdfTablesTool(TanodTool):
+class PdfTablesTool(TanodTool, Tool):
     def run(self, params: dict[str, Any]) -> Generator[ToolInvokeMessage]:
         body, source = source_body(params)
         pages = (params.get("pages") or "").strip()

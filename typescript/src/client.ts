@@ -518,7 +518,7 @@ export class Tanod {
 
   // -- sitepeek / dnspeek ----------------------------------------------------
 
-  /** sitepeek: public URL -> Markdown (or PNG screenshot, base64). USD 0.005 static / 0.01 JS or screenshot; 5 free static/IP/day. */
+  /** sitepeek: public URL -> Markdown (or PNG screenshot, base64). USD 0.002 static / 0.01 JS or screenshot; 5 free static/IP/day. */
   async render(
     url: string,
     opts: { format?: "markdown" | "screenshot"; js?: boolean; width?: number; height?: number } = {},
@@ -545,7 +545,7 @@ export class Tanod {
     return this.#call({ method: "POST", path: "/v1/meta", body: { url } });
   }
 
-  /** sitepeek: OCR of a public image (PNG, JPEG, WebP, GIF, single-page TIFF; <= 10 MB). `lang` is a tesseract code (installed: eng). USD 0.01; shares the 5 free/IP/day. */
+  /** sitepeek: OCR of a public image (PNG, JPEG, WebP, GIF, single-page TIFF; <= 10 MB). `lang` is a tesseract code (installed: eng). USD 0.0025; shares the 5 free/IP/day. */
   async ocrImage(url: string, lang?: string): Promise<T.WithMeta<T.OcrResult>> {
     return this.#call({ method: "POST", path: "/v1/ocr", body: compact({ url, lang }) });
   }
@@ -563,7 +563,7 @@ export class Tanod {
     return this.#call({ method: "POST", path: "/v1/rdap", body: { query } });
   }
 
-  /** dnspeek: email syntax and DNS checks (no SMTP; mailbox existence is not verified). USD 0.002; shares the 5 free/IP/day. */
+  /** dnspeek: email syntax and DNS checks (no SMTP; mailbox existence is not verified). USD 0.001; shares the 5 free/IP/day. */
   async verifyEmail(email: string): Promise<T.WithMeta<T.EmailVerification>> {
     return this.#call({ method: "POST", path: "/v1/email/verify", body: { email } });
   }
@@ -684,7 +684,7 @@ export class Tanod {
 
   // -- findpeek / weatherpeek ----------------------------------------------------
 
-  /** findpeek: web search over an independent index (title, url, snippet). USD 0.012; 3 free/IP/day. Results are untrusted web content. */
+  /** findpeek: web search over an independent index (title, url, snippet). USD 0.007; 3 free/IP/day. Results are untrusted web content. */
   async webSearch(
     query: string,
     opts: { count?: number; country?: string; freshness?: T.Freshness } = {},

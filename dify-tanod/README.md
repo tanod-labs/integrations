@@ -8,7 +8,7 @@ Source repository: https://github.com/tanod-labs/integrations (this plugin lives
 
 | Tool | Does | Price per call |
 | --- | --- | --- |
-| Bank statement to CSV / JSON | Text-PDF bank statement to dated transactions, signed amounts, balances, a running-balance check on every row | USD 0.02 |
+| Bank statement to CSV / JSON | Text-PDF bank statement to dated transactions, signed amounts, balances, a running-balance check on every row | USD 0.01 |
 | PDF tables to Markdown / CSV | Every table in a text PDF | USD 0.01 |
 | Document to Markdown | PDF, Word, Excel, PowerPoint, HTML, EPUB, CSV to Markdown | USD 0.005 |
 | PDF OCR | Scanned PDF to text plus a 24 hour searchable-PDF link (max 10 pages, English) | USD 0.01 up to 5 pages, USD 0.02 for 6-10 |

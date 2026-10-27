@@ -1,7 +1,7 @@
 # langchain-tanod
 
 [LangChain](https://python.langchain.com) tools for [Tanod](https://tanod.dev): pay-per-call
-security and utility tools for AI agents. No signup and no API key. Each tool has a free daily
+security and utility tools for AI agents. No signup and no API key. Eligible routes have a free daily
 tier. Past it, the agent pays per call in USDC on Base with [x402](https://x402.org), through
 the [`tanod`](https://pypi.org/project/tanod/) SDK.
 
@@ -44,7 +44,7 @@ These tools are built by default:
 | `tanod_scan_contract_source` | pactlint: static analysis of one Solidity file | 0.25 / 0.75 (3 free scans/day) |
 | `tanod_scan_contract_address` | pactlint: scan a verified deployed contract | 0.25 / 0.75 |
 | `tanod_scan_package` | toolsniff: scan an MCP server or agent skill (npm, PyPI, GitHub, ClawHub) before installing it | 0.02 / 0.05 |
-| `tanod_render_url` | sitepeek: web page to Markdown | 0.005 (0.01 with JS); 5 free/day |
+| `tanod_render_url` | sitepeek: web page to Markdown | 0.002 (0.01 with JS); 5 free/day |
 | `tanod_inspect_domain` | dnspeek: DNS, email auth, TLS | 0.01 (0.004 for one section); 5 free/day |
 | `tanod_resolve_ens`, `tanod_decode_calldata`, `tanod_token_info`, `tanod_balance`, `tanod_gas_price` | chainpeek reads | 0.001 to 0.003 (10 free/day, shared) |
 | `tanod_agents_summary` | agentscan: summary of the x402/MCP index | free |
@@ -56,10 +56,10 @@ These tools are opt-in. Request them with `include=[...]`, or pass `TOOL_NAMES` 
 - `tanod_latest_block` (0.001)
 - `tanod_agents_history` (0.05)
 - `tanod_agents_export` (0.25, no free tier)
-- `tanod_extract_pdf` (0.005), `tanod_get_page_meta` (0.002), `tanod_ocr_image` (0.01): sitepeek, sharing its 5 free calls/day
-- `tanod_rdap_lookup` (0.002), `tanod_verify_email` (0.002, DNS only, no SMTP), `tanod_ip_lookup` (0.001): dnspeek, sharing its 5 free calls/day
+- `tanod_extract_pdf` (0.005), `tanod_get_page_meta` (0.002), `tanod_ocr_image` (0.0025): sitepeek, sharing its 5 free calls/day
+- `tanod_rdap_lookup` (0.002), `tanod_verify_email` (0.001, DNS only, no SMTP), `tanod_ip_lookup` (0.001): dnspeek, sharing its 5 free calls/day
 - `tanod_get_token_price` (0.002, Chainlink), `tanod_get_transaction` (0.002), `tanod_get_nft` (0.002), `tanod_get_allowance` (0.002), `tanod_get_portfolio` (0.004), `tanod_get_swap_quote` (0.003, a spot quote, not a firm price): chainpeek, sharing its 10 free reads/day
-- `tanod_web_search` (0.012, 3 free/day): findpeek
+- `tanod_web_search` (0.007, 3 free/day): findpeek (page text adds USD 0.002 per result through the API)
 - `tanod_get_weather` (0.002, 5 free/day): weatherpeek
 - skypeek (0.001 each, `satellite_passes` 0.002; the 5 free calls/day are one pool): `tanod_get_metar`, `tanod_get_taf`, `tanod_decode_metar_taf`, `tanod_lookup_airport`, `tanod_airport_distance`, `tanod_get_space_weather`, `tanod_aurora_forecast`, `tanod_asteroid_close_approaches`, `tanod_sun_moon_times`, `tanod_satellite_passes`
 - mlpeek (open models run on Tanod's own CPU; 5 free calls/day, one pool): `tanod_embed_texts` and `tanod_text_similarity` (0.0005 per text or pair, at least 0.001 per call), `tanod_rerank_documents` (0.002), `tanod_extract_entities` and `tanod_classify_zero_shot` (0.001)

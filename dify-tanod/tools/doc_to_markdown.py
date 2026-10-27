@@ -1,13 +1,14 @@
 from collections.abc import Generator
 from typing import Any
 
+from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
 from utils.base import TanodTool
 from utils.tanod import source_body
 
 
-class DocToMarkdownTool(TanodTool):
+class DocToMarkdownTool(TanodTool, Tool):
     def run(self, params: dict[str, Any]) -> Generator[ToolInvokeMessage]:
         body, source = source_body(params, with_filename=True)
         out = self.client().call("/v1/docs/to-markdown", body)

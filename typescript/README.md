@@ -2,7 +2,7 @@
 
 TypeScript client for [Tanod](https://tanod.dev): pay-per-call security and utility tools for AI
 agents. No signup and no API key. You pay per call in USDC on Base with
-[x402](https://x402.org), and every tool has a free daily tier (except the bulk exports and the URL and sanctions batches).
+[x402](https://x402.org), with free daily allowances on eligible routes.
 Payments use the official x402 client packages, [`@x402/fetch`](https://www.npmjs.com/package/@x402/fetch)
 and [`@x402/evm`](https://www.npmjs.com/package/@x402/evm).
 
@@ -12,13 +12,13 @@ and [`@x402/evm`](https://www.npmjs.com/package/@x402/evm).
 | **pactlint**: Solidity static analysis | `scanContractSource`, `scanContractAddress` | 0.25 (≤3k nSLOC), 0.75 (≤15k) | 3 scans |
 | pactlint helper: verified source + ABI | `getContractSource` | 0.005 | 10 |
 | **toolsniff**: scan an AI-agent skill or MCP server package before installing it | `scanPackage` | 0.02 (0.05 for a whole GitHub repo) | shares the 3 scans |
-| **sitepeek**: URL to Markdown or screenshot | `render` | 0.005 static, 0.01 JS/screenshot | 5 static |
-| sitepeek: PDF text, page metadata, image OCR | `extractPdf`, `pageMeta`, `ocrImage` | 0.005 / 0.002 / 0.01 | shares the 5 |
+| **sitepeek**: URL to Markdown or screenshot | `render` | 0.002 static, 0.01 JS/screenshot | 5 static |
+| sitepeek: PDF text, page metadata, image OCR | `extractPdf`, `pageMeta`, `ocrImage` | 0.005 / 0.002 / 0.0025 | shares the 5 |
 | **dnspeek**: DNS, email auth and TLS | `inspectDomain` | 0.01 (0.004 for one section) | 5 |
-| dnspeek: RDAP, email check (no SMTP), IP lookup | `rdapLookup`, `verifyEmail`, `ipLookup` | 0.002 / 0.002 / 0.001 | shares the 5 |
+| dnspeek: RDAP, email check (no SMTP), IP lookup | `rdapLookup`, `verifyEmail`, `ipLookup` | 0.002 / 0.001 / 0.001 | shares the 5 |
 | **chainpeek**: ENS, calldata, token, balance, gas, block | `resolveEns`, `decodeCalldata`, `tokenInfo`, `balance`, `gasPrice`, `latestBlock` | 0.001 to 0.003 | 10 (shared) |
 | chainpeek: Chainlink price, transaction, NFT, allowance, portfolio, Uniswap V3 spot quote | `tokenPrice`, `transaction`, `nft`, `allowance`, `portfolio`, `swapQuote` | 0.002 / 0.002 / 0.002 / 0.002 / 0.004 / 0.003 | shares the 10 |
-| **findpeek**: web search | `webSearch` | 0.012 | 3 |
+| **findpeek**: web search | `webSearch` | 0.007 (up to 0.027 with page text) | 3 |
 | **weatherpeek**: hourly forecast | `weather` | 0.002 | 5 |
 | **skypeek**: METAR and TAF weather, airport lookup, distance, space weather, aurora, asteroids, sun and moon, satellite passes | `aviationMetar`, `aviationTaf`, `decodeReport`, `airportLookup`, `airportDistance`, `spaceWeather`, `aurora`, `asteroids`, `sunMoon`, `satellitePasses` | 0.001 each (`satellitePasses` 0.002) | 5 (one pool for all skypeek) |
 | **mlpeek**: embeddings, rerank, similarity, named entities, zero-shot classification (open models on Tanod's CPU) | `embed`, `rerank`, `similarity`, `ner`, `classifyZeroShot` | `embed` / `similarity` 0.0005 per text / pair, at least 0.001 per call; `rerank` 0.002; `ner` / `classifyZeroShot` 0.001 | 5 (one pool for all mlpeek) |

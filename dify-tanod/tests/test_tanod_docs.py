@@ -205,3 +205,18 @@ def test_provider_validation():
     assert "SECRET" not in str(e.value)
     with pytest.raises(ToolProviderCredentialValidationError):
         p._validate_credentials({"max_price_usd": "abc"})
+
+
+def test_each_tool_module_holds_exactly_one_tool_subclass():
+    # The SDK's own rule (dify_plugin.core.utils.class_loader.get_subclasses_from_module); PR #3378 failed on it.
+    import importlib
+    from pathlib import Path
+
+    from dify_plugin import Tool
+
+    modules = sorted(p.stem for p in (Path(__file__).resolve().parents[1] / "tools").glob("*.py"))
+    assert len(modules) == 5
+    for name in modules:
+        mod = importlib.import_module(f"tools.{name}")
+        found = [x for x in vars(mod).values() if isinstance(x, type) and x != Tool and issubclass(x, Tool)]
+        assert len(found) == 1, (name, found)
