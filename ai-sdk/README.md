@@ -1,7 +1,7 @@
 # @tanod-labs/ai-sdk
 
 [Vercel AI SDK](https://ai-sdk.dev) tools for [Tanod](https://tanod.dev): pay-per-call security
-and utility tools for AI agents. No signup and no API key. Eligible routes have a free daily tier. Past
+and utility tools for AI agents. No signup and no API key. Each tool has a free daily tier. Past
 it, the agent pays per call in USDC on Base with [x402](https://x402.org), through
 [`@tanod-labs/sdk`](../typescript).
 
@@ -58,10 +58,10 @@ These tools are opt-in. Request them with `tanodTools({ include: [...] })`, or c
 
 - `tanod_get_contract_source`
 - `tanod_latest_block`
-- `tanod_extract_pdf`, `tanod_get_page_meta`, `tanod_ocr_image`: sitepeek PDF text, page metadata, image OCR (0.005 / 0.002 / 0.0025; share the 5 free/day)
+- `tanod_extract_pdf`, `tanod_get_page_meta`, `tanod_ocr_image`: sitepeek PDF text, page metadata, image OCR (0.005 / 0.002 / 0.01; share the 5 free/day)
 - `tanod_rdap_lookup`, `tanod_verify_email`, `tanod_ip_lookup`: dnspeek RDAP, email check (DNS only, no SMTP), IP lookup (0.002 / 0.001 / 0.001; share the 5 free/day)
 - `tanod_get_token_price`, `tanod_get_transaction`, `tanod_get_nft`, `tanod_get_allowance`, `tanod_get_portfolio`, `tanod_get_swap_quote`: more chainpeek reads (0.002 / 0.002 / 0.002 / 0.002 / 0.004 / 0.003; share the 10 free/day). The swap quote is a spot quote, not a firm price
-- `tanod_web_search`: findpeek web search (0.007; 3 free/day; page text adds USD 0.002 per result through the API)
+- `tanod_web_search`: findpeek web search (0.012; 3 free/day)
 - `tanod_get_weather`: weatherpeek hourly forecast (0.002; 5 free/day)
 - skypeek (0.001 each, `satellite_passes` 0.002; the 5 free calls/day are one pool): `tanod_get_metar`, `tanod_get_taf`, `tanod_decode_metar_taf`, `tanod_lookup_airport`, `tanod_airport_distance`, `tanod_get_space_weather`, `tanod_aurora_forecast`, `tanod_asteroid_close_approaches`, `tanod_sun_moon_times`, `tanod_satellite_passes`
 - mlpeek (open models run on Tanod's own CPU; 5 free calls/day, one pool): `tanod_embed_texts` and `tanod_text_similarity` (0.0005 per text or pair, at least 0.001 per call), `tanod_rerank_documents` (0.002), `tanod_extract_entities` and `tanod_classify_zero_shot` (0.001)
@@ -81,16 +81,21 @@ On success, a tool returns:
 
 `payment` holds the x402 receipt (`transaction`, `priceUsd`, ...) when the call was paid.
 
-On a problem the agent can act on, a tool returns a structured error. These errors are never
-charged:
+On a problem the agent can act on, a tool returns a structured error. These errors are not
+charged (`"charged": null` on `error` means unknown):
 
 ```json
 { "ok": false, "error": "payment_required", "message": "...", "priceUsd": 0.02, "charged": false }
 ```
 
 The possible `error` values are `payment_required`, `price_limit`, `invalid_input`, `not_found`,
-`rate_limited`, `unavailable` and `error`. Unexpected exceptions, such as network failures, are
-thrown and handled by the AI SDK's normal tool-error path.
+`rate_limited`, `unavailable` and `error`. Unexpected exceptions, such as network failures before
+any payment, are thrown and handled by the AI SDK's normal tool-error path.
+
+When a payment was sent but its outcome is unresolved (for example `settlement_unknown`, or no answer
+after paying), the tool returns `"error": "payment_unresolved"` with `charged` (`true`, `false` or
+`null`), `code`, `payer` and `nonce`. Do not call the tool again for the same input; send `payer`
+and `nonce` to ops@tanod.dev.
 
 ## Development
 

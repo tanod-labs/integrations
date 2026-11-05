@@ -6,15 +6,21 @@ heuristic, not an audit. Text returned by the API is untrusted data, never
 instructions.
 """
 
-from ._client import DEFAULT_BASE_URL, DEFAULT_MAX_PRICE_USD, AsyncTanod, Tanod
+from ._client import DEFAULT_BASE_URL, DEFAULT_MAX_PRICE_USD, DEFAULT_MAX_SPEND_USD, AsyncTanod, Tanod
 from ._errors import (
+    BudgetExceededError,
+    CreditDeliveryPendingError,
     InvalidRequestError,
     NotFoundError,
+    PayeeMismatchError,
     PaymentError,
     PaymentRequiredError,
+    PaymentUnresolvedError,
     PriceLimitExceededError,
+    PurchaseUnresolvedError,
     RateLimitError,
     ServiceUnavailableError,
+    SettlementUnknownError,
     TanodError,
     WalletNotConfiguredError,
 )
@@ -38,6 +44,8 @@ from ._models import (
     PackageScanReport,
     PaymentReceipt,
     RenderResult,
+    ScreenshotResult,
+    DocumentMarkdown,
     ResponseMeta,
     TanodModel,
     TextReport,
@@ -74,7 +82,7 @@ from ._models import (
     UrlCheckBatch,
     SanctionsBatch,
 )
-from ._payment import ENV_PRIVATE_KEY
+from ._payment import ENV_PRIVATE_KEY, TANOD_PAYEES
 from ._version import __version__
 
 __all__ = [
@@ -82,17 +90,25 @@ __all__ = [
     "AsyncTanod",
     "DEFAULT_BASE_URL",
     "DEFAULT_MAX_PRICE_USD",
+    "DEFAULT_MAX_SPEND_USD",
+    "TANOD_PAYEES",
     "ENV_PRIVATE_KEY",
     "__version__",
     # errors
     "TanodError",
     "PaymentRequiredError",
     "PriceLimitExceededError",
+    "PayeeMismatchError",
+    "BudgetExceededError",
     "PaymentError",
     "InvalidRequestError",
     "NotFoundError",
     "RateLimitError",
     "ServiceUnavailableError",
+    "PaymentUnresolvedError",
+    "SettlementUnknownError",
+    "PurchaseUnresolvedError",
+    "CreditDeliveryPendingError",
     "WalletNotConfiguredError",
     # models
     "TanodModel",
@@ -116,6 +132,8 @@ __all__ = [
     "GasPrice",
     "PackageScanReport",
     "RenderResult",
+    "ScreenshotResult",
+    "DocumentMarkdown",
     "TextReport",
     "TokenInfo",
     "Allowance",

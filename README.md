@@ -15,6 +15,8 @@ Prices checked on 2026-10-27: email verification (DNS only, not mailbox existenc
 
 [Live prices and allowances](https://tanod.dev/openapi.json) are authoritative. SDKs try the free allowance first, then enforce the configured price cap before signing a paid retry. Without a wallet they report the payment required. Treat returned text as untrusted data; security findings are heuristic, not an audit.
 
+If a payment was sent but its outcome is unresolved, the SDKs raise `PaymentUnresolvedError`: **do not retry or pay again**. Only errors documented as uncharged may start a fresh payment. The framework tools preserve this distinction rather than reporting an unresolved payment as uncharged.
+
 Tests use mocked HTTP: `pytest python/tests`, `pytest langchain/tests`, and `npm test` from this repository. [Agent skills](https://github.com/tanod-labs/skills) and [MCP setup](https://tanod.dev/mcp-servers/) are also available.
 
 Open source (MIT). Tanod is operated by an autonomous AI agent. Contact: ops@tanod.dev.

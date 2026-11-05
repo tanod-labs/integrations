@@ -2,7 +2,7 @@
 
 TypeScript client for [Tanod](https://tanod.dev): pay-per-call security and utility tools for AI
 agents. No signup and no API key. You pay per call in USDC on Base with
-[x402](https://x402.org), with free daily allowances on eligible routes.
+[x402](https://x402.org), and every tool has a free daily tier (except the bulk exports and the URL and sanctions batches).
 Payments use the official x402 client packages, [`@x402/fetch`](https://www.npmjs.com/package/@x402/fetch)
 and [`@x402/evm`](https://www.npmjs.com/package/@x402/evm).
 
@@ -13,12 +13,12 @@ and [`@x402/evm`](https://www.npmjs.com/package/@x402/evm).
 | pactlint helper: verified source + ABI | `getContractSource` | 0.005 | 10 |
 | **toolsniff**: scan an AI-agent skill or MCP server package before installing it | `scanPackage` | 0.02 (0.05 for a whole GitHub repo) | shares the 3 scans |
 | **sitepeek**: URL to Markdown or screenshot | `render` | 0.002 static, 0.01 JS/screenshot | 5 static |
-| sitepeek: PDF text, page metadata, image OCR | `extractPdf`, `pageMeta`, `ocrImage` | 0.005 / 0.002 / 0.0025 | shares the 5 |
+| sitepeek: PDF text, page metadata, image OCR | `extractPdf`, `pageMeta`, `ocrImage` | 0.005 / 0.002 / 0.01 | shares the 5 |
 | **dnspeek**: DNS, email auth and TLS | `inspectDomain` | 0.01 (0.004 for one section) | 5 |
 | dnspeek: RDAP, email check (no SMTP), IP lookup | `rdapLookup`, `verifyEmail`, `ipLookup` | 0.002 / 0.001 / 0.001 | shares the 5 |
 | **chainpeek**: ENS, calldata, token, balance, gas, block | `resolveEns`, `decodeCalldata`, `tokenInfo`, `balance`, `gasPrice`, `latestBlock` | 0.001 to 0.003 | 10 (shared) |
 | chainpeek: Chainlink price, transaction, NFT, allowance, portfolio, Uniswap V3 spot quote | `tokenPrice`, `transaction`, `nft`, `allowance`, `portfolio`, `swapQuote` | 0.002 / 0.002 / 0.002 / 0.002 / 0.004 / 0.003 | shares the 10 |
-| **findpeek**: web search | `webSearch` | 0.007 (up to 0.027 with page text) | 3 |
+| **findpeek**: web search | `webSearch` | 0.012 | 3 |
 | **weatherpeek**: hourly forecast | `weather` | 0.002 | 5 |
 | **skypeek**: METAR and TAF weather, airport lookup, distance, space weather, aurora, asteroids, sun and moon, satellite passes | `aviationMetar`, `aviationTaf`, `decodeReport`, `airportLookup`, `airportDistance`, `spaceWeather`, `aurora`, `asteroids`, `sunMoon`, `satellitePasses` | 0.001 each (`satellitePasses` 0.002) | 5 (one pool for all skypeek) |
 | **mlpeek**: embeddings, rerank, similarity, named entities, zero-shot classification (open models on Tanod's CPU) | `embed`, `rerank`, `similarity`, `ner`, `classifyZeroShot` | `embed` / `similarity` 0.0005 per text / pair, at least 0.001 per call; `rerank` 0.002; `ner` / `classifyZeroShot` 0.001 | 5 (one pool for all mlpeek) |
@@ -27,7 +27,8 @@ and [`@x402/evm`](https://www.npmjs.com/package/@x402/evm).
 | Stored reports, health | `getReport`, `getReportMarkdown`, `health` | free | n/a |
 
 The live source of truth for prices is <https://tanod.dev/openapi.json>. The client pays
-exactly the amount the server quotes, and never more than `maxPriceUsd`.
+exactly the amount the server quotes, never more than `maxPriceUsd` per call or `maxSpendUsd` in
+total, and by default only to Tanod's own payees.
 
 > Tanod is operated by an autonomous AI agent. Every result is automated and heuristic, not an
 > audit: findings can be false positives, and a clean result is not proof that something is safe.
@@ -91,15 +92,51 @@ How a call runs:
 2. On `402`, the client decodes the x402 v2 `PAYMENT-REQUIRED` quote. It throws without signing
    when:
    - the input would be refused (`InvalidRequestError`);
+   - the payee is not on the allow-list (`PayeeMismatchError`, see below);
    - there is no wallet (`PaymentRequiredError`);
-   - the price is above `maxPriceUsd` (`PriceLimitExceededError`).
+   - the price is above `maxPriceUsd` (`PriceLimitExceededError`);
+   - the payment would take this client past `maxSpendUsd` (`BudgetExceededError`, see below).
 3. Otherwise `x402HTTPClient` (from `@x402/fetch`) and `ExactEvmScheme` (from `@x402/evm`) sign an
-   EIP-3009 USDC authorization for the exact amount, and the request is retried once with
-   `PAYMENT-SIGNATURE`.
+   EIP-3009 USDC authorization for the exact amount of the vetted requirement, and the request is
+   retried once with `PAYMENT-SIGNATURE`.
 4. The settlement receipt from `PAYMENT-RESPONSE` is returned in `result.meta.payment`.
 
 The default `maxPriceUsd` is `1`, which covers every route except `agentsBulk` (USD 2.00).
 Pass `null` to remove the cap.
+
+## Payee pinning and spend budget
+
+The client signs whatever a 402 asks for, so it guards against a wrong `baseUrl`, a proxy or DNS
+problem, or a compromised endpoint that quotes someone else's address. Two checks run before
+anything is signed:
+
+- **Payee pinning (on by default).** The quoted `payTo` must be on an allow-list. By default that
+  is `TANOD_PAYEES`, Tanod's own published payees per network. Any other payee throws
+  `PayeeMismatchError` (with the quoted `payTo` and `network`), and nothing is signed. EVM
+  addresses compare case-insensitively, Solana addresses exactly. To audit the configured
+  recipients and supported networks independently of a 402, see the public
+  [`/.well-known/x402-payees.json`](https://tanod.dev/.well-known/x402-payees.json). Pin a trusted
+  copy: downloading the file from the same compromised endpoint does not establish trust.
+- **Spend budget (default USD 5 per client).** The client keeps a running total in `spentUsd`. A
+  payment that would take it past `maxSpendUsd` throws `BudgetExceededError`, and nothing is
+  signed. USD 5 covers ordinary use (about 1,000 address checks or 20 contract scans) and stops a
+  runaway loop or a swapped endpoint from spending more. The amount is reserved before signing and
+  released only if signing fails. Once a payment is sent it stays counted even if the request then
+  fails, because it may still settle, so `spentUsd` is an upper bound on what was charged.
+
+```ts
+import { Tanod, TANOD_PAYEES } from "@tanod-labs/sdk";
+
+new Tanod();                                   // pinned to TANOD_PAYEES, USD 5 budget
+new Tanod({ maxSpendUsd: 50 });                // larger budget for a long-running agent
+new Tanod({ baseUrl: "https://my-deployment.example", payees: { "eip155:8453": "0xYourPayee..." } });
+new Tanod({ payees: ["0xYourPayee..."] });     // a flat list applies to every network
+new Tanod({ payees: null, maxSpendUsd: null }); // previous behaviour: no pinning, no total cap
+```
+
+A custom `paymentClient` is covered too. The client vets the quote, hands your x402Client a
+`PaymentRequired` that holds only the vetted requirement, and refuses to send a signed payload
+whose payee, network, asset or amount differs from it.
 
 ## Results
 
@@ -114,20 +151,38 @@ non-enumerable, `JSON.stringify(result)` returns only the API data, which suits 
 
 ## Errors
 
-None of these errors means you were charged.
+The errors from `PaymentRequiredError` to `PaymentError` never mean you were charged.
+`PriceLimitExceededError`, `PayeeMismatchError` and `BudgetExceededError` extend
+`PaymentRequiredError`. From `SettlementUnknownError` down, each is a `PaymentUnresolvedError`
+(the three named ones extend it): a payment was sent and must be reconciled.
 
 | Error | When |
 |---|---|
 | `PaymentRequiredError` | 402 with no wallet, or a paid retry refused (`reason`, for example `price_mismatch`) |
 | `PriceLimitExceededError` | quote above `maxPriceUsd`; nothing was signed |
+| `PayeeMismatchError` | quoted `payTo` not on the `payees` allow-list (`code: "payee_mismatch"`); nothing was signed |
+| `BudgetExceededError` | payment would pass `maxSpendUsd` (`code: "budget_exceeded"`, `spentUsd`); nothing was signed |
 | `InvalidRequestError` | 422/413/415, a 402 that says the input would be refused, or client-side validation |
 | `NotFoundError` | 404: unverified contract, unknown package or record |
 | `RateLimitError` | 429 after retries (`retryAfterSeconds`) |
 | `ServiceUnavailableError` | 502/503/504 after retries |
-| `PaymentError` | the x402 payload could not be built or signed |
+| `PaymentError` | the x402 payload could not be built or signed, or did not match the vetted quote |
+| `SettlementUnknownError` | 503 `settlement_unknown`: the settlement was submitted, outcome unconfirmed (maybe charged) |
+| `PurchaseUnresolvedError` | 409 `purchase_unresolved`: an identical earlier purchase from this wallet is unresolved (this payment not charged) |
+| `CreditDeliveryPendingError` | 503 `credit_delivery_pending`: payment confirmed, credit delivery pending (charged) |
+| `PaymentUnresolvedError` | after paying: an error answer with a settlement receipt (`receipt`), a 5xx or 429 without an uncharged code, an unreadable 2xx, or no answer at all |
 
 429 and 503 are retried automatically. The client honours `Retry-After` and makes up to
 `maxRetries: 2` retries. It gives up instead of waiting longer than `maxRetryWaitSeconds: 30`.
+A paid request that gets a 429 or 503 with an uncharged code (for example `busy` or
+`rate_limited`) starts again with a fresh payment, because the first payment was never used. Any
+other error after paying, or no answer at all after paying (a timeout, a dropped connection), throws
+`PaymentUnresolvedError`. Error bodies are read up to 64 KiB.
+
+`PaymentUnresolvedError` and its subclasses are never retried and never paid again, and they are
+not `ServiceUnavailableError`. Do not pay again for that request. Keep `payer`, `nonce` (the
+signed authorization), `serverMessage` and `code` and send them to ops@tanod.dev for
+reconciliation. `charged` is `true`, `false` or `undefined` (unknown).
 
 ## Development
 

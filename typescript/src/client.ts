@@ -6,33 +6,69 @@
  *     leaves it off); the free daily tier answers 200 when it covers the call. The paid retry never
  *     carries the header.
  *  2. On 402: if the quote says the input would be refused -> InvalidRequestError (nothing signed);
- *     no wallet -> PaymentRequiredError (with price); above maxPriceUsd -> PriceLimitExceededError.
- *     Otherwise sign with the official x402 client (@x402/fetch + @x402/evm) and retry once.
- *  3. 429/503 are retried honouring Retry-After (never charged).
+ *     payee not on the allow-list (`payees`) -> PayeeMismatchError; no wallet -> PaymentRequiredError
+ *     (with price); above maxPriceUsd -> PriceLimitExceededError; past maxSpendUsd for this client ->
+ *     BudgetExceededError. Otherwise reserve the amount against the budget, sign with the official
+ *     x402 client (@x402/fetch + @x402/evm) handing it only the vetted requirement, and retry once.
+ *  3. 429/503 are retried honouring Retry-After. Unpaid, they are never charged. After a payment was
+ *     sent, only the server's documented uncharged codes (UNCHARGED) are retried, with a fresh
+ *     payment; every other 5xx or 429, an error answer carrying a settlement receipt,
+ *     `settlement_unknown` / `purchase_unresolved` / `credit_delivery_pending` (paid or not), no
+ *     answer at all (timeout, dropped connection, body read error) and a paid 2xx that cannot be read
+ *     throw `PaymentUnresolvedError` (or a subclass): never retried, never paid again.
  *  4. The settlement receipt (PAYMENT-RESPONSE) is in `result.meta.payment`.
  */
 
 import { x402Client, x402HTTPClient } from "@x402/fetch";
-import type { PaymentRequired } from "@x402/fetch";
+import type { PaymentPayload, PaymentRequired, PaymentRequirements } from "@x402/fetch";
 import { ExactEvmScheme } from "@x402/evm";
 import { privateKeyToAccount } from "viem/accounts";
 
 import {
+  BudgetExceededError,
+  CreditDeliveryPendingError,
   InvalidRequestError,
   NotFoundError,
+  PayeeMismatchError,
   PaymentError,
   PaymentRequiredError,
+  PaymentUnresolvedError,
   PriceLimitExceededError,
+  PurchaseUnresolvedError,
   RateLimitError,
   ServiceUnavailableError,
+  SettlementUnknownError,
   TanodError,
   type QuoteDetails,
 } from "./errors.js";
 import type * as T from "./types.js";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.1";
 export const DEFAULT_BASE_URL = "https://tanod.dev";
 export const DEFAULT_MAX_PRICE_USD = 1;
+/**
+ * Default total a client instance may sign over its lifetime (USD). It covers ordinary use
+ * (about 1,000 address checks at USD 0.005, or 20 contract scans at USD 0.25) and stops a runaway
+ * loop or a swapped endpoint from spending more. Raise it, or pass null, for heavier use.
+ */
+export const DEFAULT_MAX_SPEND_USD = 5;
+/**
+ * Tanod's own payees (x402 `payTo`) per CAIP-2 network: the default allow-list for `payees`.
+ * Source: the `accepts` list of an unpaid POST https://tanod.dev/v1/check/address
+ * (PAYMENT-REQUIRED header and JSON body agree), read 2026-10-15. EVM networks share one address.
+ */
+export const TANOD_PAYEES: Readonly<Record<string, string>> = Object.freeze({
+  "eip155:8453": "0x593857A4a4F619543ea12394137C3004ce841720", // Base
+  "eip155:137": "0x593857A4a4F619543ea12394137C3004ce841720", // Polygon
+  "eip155:56": "0x593857A4a4F619543ea12394137C3004ce841720", // BNB Chain
+  "eip155:42161": "0x593857A4a4F619543ea12394137C3004ce841720", // Arbitrum One
+  "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp": "RMk9k3VC8dr4hhjgFh88rGhjAbzfBzHxJJ5n2fTcqus", // Solana mainnet
+});
+/**
+ * Allow-list of payees: per CAIP-2 network (`{ "eip155:8453": "0x..." }`), or a flat list that
+ * applies to every network. EVM addresses compare case-insensitively, others exactly.
+ */
+export type Payees = Readonly<Record<string, string | readonly string[]>> | readonly string[];
 export const ENV_PRIVATE_KEY = "TANOD_PRIVATE_KEY";
 /** Header that opts an unpaid call in to the server's free daily tier. */
 export const FREE_TIER_HEADER = "X-Tanod-Free";
@@ -56,14 +92,30 @@ export interface TanodOptions {
   privateKey?: string;
   /** A viem account or any EIP-712 signer, instead of a raw key. */
   signer?: EvmSigner;
-  /** A fully configured x402Client (advanced: custom wallets, policies). Overrides key/signer. */
+  /**
+   * A fully configured x402Client (advanced: custom wallets, policies). Overrides key/signer.
+   * Payee pinning and the spend budget still apply: the client vets the quote first and hands
+   * this x402Client only the vetted requirement, then refuses to send a payload that names
+   * anything else.
+   */
   paymentClient?: x402Client;
   /** Refuse to sign any single payment above this USD amount (default 1; agentsBulk costs 2). null = no cap. */
   maxPriceUsd?: number | null;
+  /**
+   * Only ever pay these payees (default: TANOD_PAYEES, Tanod's own). A quote naming any other
+   * `payTo` throws PayeeMismatchError and nothing is signed. Set this when you point `baseUrl`
+   * at another deployment; null disables pinning.
+   */
+  payees?: Payees | null;
+  /**
+   * Total USD this client instance may sign, summed over all calls (default 5). A payment that
+   * would go past it throws BudgetExceededError and nothing is signed. null = no total cap.
+   */
+  maxSpendUsd?: number | null;
   /** Read TANOD_PRIVATE_KEY from the environment when no key/signer is given (default true). */
   useEnv?: boolean;
   baseUrl?: string;
-  /** Retries on 429/503 (default 2). */
+  /** Retries on 429/503 (default 2). `PaymentUnresolvedError` is never retried. */
   maxRetries?: number;
   /** Give up instead of sleeping longer than this (default 30 s). */
   maxRetryWaitSeconds?: number;
@@ -165,6 +217,44 @@ function atomicToUsd(amount?: string): number | undefined {
   return Number(amount) / 10 ** USDC_DECIMALS;
 }
 
+function usdToAtomic(usd: unknown, what: string): bigint {
+  if (typeof usd !== "number" || !Number.isFinite(usd) || usd < 0) {
+    throw new InvalidRequestError(`${what} must be a non-negative number of USD, or null`);
+  }
+  return BigInt(Math.round(usd * 10 ** USDC_DECIMALS));
+}
+
+/** Network (CAIP-2) or "*" (a flat list: any network) -> allowed payees. */
+type PayeeTable = ReadonlyMap<string, readonly string[]>;
+
+function payeeTable(payees: Payees | null | undefined): PayeeTable | null {
+  if (payees === null) return null;
+  const src: unknown = payees === undefined ? TANOD_PAYEES : payees;
+  const list = (v: unknown, where: string): string[] => {
+    const arr: unknown[] | undefined = typeof v === "string" ? [v] : Array.isArray(v) ? v : undefined;
+    if (!arr || arr.length === 0 || !arr.every((a) => typeof a === "string" && a.trim().length > 0)) {
+      throw new InvalidRequestError(`payees${where} must be an address or a non-empty list of addresses (null disables pinning)`);
+    }
+    return (arr as string[]).map((a) => a.trim());
+  };
+  const table = new Map<string, string[]>();
+  if (typeof src === "string" || Array.isArray(src)) table.set("*", list(src, ""));
+  else if (src && typeof src === "object") for (const [net, v] of Object.entries(src)) table.set(net, list(v, `[${JSON.stringify(net)}]`));
+  if (table.size === 0) throw new InvalidRequestError("payees must name at least one payee (null disables pinning)");
+  return table;
+}
+
+function payeeAllowed(table: PayeeTable, network: unknown, payTo: unknown): boolean {
+  if (typeof network !== "string" || typeof payTo !== "string") return false;
+  const allowed = table.get(network) ?? table.get("*");
+  if (!allowed) return false;
+  if (network.startsWith("eip155:")) {
+    const p = payTo.toLowerCase();
+    return allowed.some((a) => a.toLowerCase() === p);
+  }
+  return allowed.includes(payTo);
+}
+
 function retryAfterSeconds(res: Response): number | undefined {
   const v = res.headers.get("retry-after");
   if (!v) return undefined;
@@ -179,8 +269,46 @@ function intHeader(res: Response, name: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-async function readBody(res: Response): Promise<{ json?: unknown; text: string }> {
-  const text = await res.text();
+/** Error answers (status >= 400) are read up to this many bytes; the rest is cancelled. */
+const ERROR_BODY_LIMIT = 64 * 1024;
+
+async function readCapped(res: Response, limit: number): Promise<string> {
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const part = value.subarray(0, limit - size);
+      chunks.push(part);
+      size += part.length;
+      if (size >= limit) {
+        await reader.cancel().catch(() => undefined);
+        break;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.length;
+  }
+  return new TextDecoder().decode(all);
+}
+
+/** Read the body; never throws (`error` is set when it could not be read). Error answers are capped. */
+async function readBody(res: Response): Promise<{ json?: unknown; text: string; error?: unknown }> {
+  let text: string;
+  try {
+    text = res.status >= 400 ? await readCapped(res, ERROR_BODY_LIMIT) : await res.text();
+  } catch (error) {
+    return { text: "", error: error ?? new Error("body read failed") };
+  }
   try {
     return { json: JSON.parse(text), text };
   } catch {
@@ -201,6 +329,65 @@ function errorText(json: unknown, text: string): string {
   return text.slice(0, 500);
 }
 
+/** `error.<name>` of a JSON error body (`{"error": {"code": ..., "message": ...}}`). */
+function errorField(json: unknown, name: string): string | undefined {
+  const e = json && typeof json === "object" ? (json as Record<string, unknown>).error : undefined;
+  const v = e && typeof e === "object" ? (e as Record<string, unknown>)[name] : undefined;
+  return typeof v === "string" ? v : undefined;
+}
+
+/** Error codes that tie up a payment: never retried, never paid again. */
+const UNRESOLVED: Record<string, typeof PaymentUnresolvedError> = {
+  settlement_unknown: SettlementUnknownError,
+  purchase_unresolved: PurchaseUnresolvedError,
+  credit_delivery_pending: CreditDeliveryPendingError,
+};
+/** What the server's code says about this payment (otherwise unknown, or true when a receipt came back). */
+const UNRESOLVED_CHARGED: Record<string, boolean | undefined> = {
+  purchase_unresolved: false,
+  credit_delivery_pending: true,
+  refund_review_unavailable: true, // 503 after the settlement (server: service._refund_marker_unavailable)
+};
+/**
+ * The only 5xx/429 codes that, after a payment was sent, are retried (with a fresh payment) or called
+ * "not charged": the server answers them before any settlement (product/api/scanapi: app._respond
+ * "(not charged)" messages; service UNAVAILABLE_REASONS and unavailable(); micro.py "unavailable"
+ * results, settled only on a worker 200; paymentid._REFUSALS "unavailable"; unsettled.PAYER_*;
+ * imagegenkit.LIMITED/CAPACITY; limits.py 429/503). Any other code after paying is unresolved.
+ */
+const UNCHARGED: ReadonlySet<string> = new Set([
+  "queue_full", "facilitator_error", "payment_identifier_unavailable", "payment_journal_capacity",
+  "busy", "rpc_unavailable", "timeout", "rpc_budget", "response_too_large", "micro_unavailable",
+  "micro_interrupted", "micro_error", "rate_limited", "host_rate_limited", "origin_cooldown",
+  "agentindex_unavailable", "exchange_unavailable", "storage_unavailable", "upload_quota", "uploads_busy",
+  "comments_changed", "reviews_changed", "listings_changed", "unsettled_failures_limited",
+  "unsettled_failures_in_flight", "image_uncharged_limited", "image_capacity", "daily_cap", "repo_lookup_limited",
+]);
+
+/** The payment that left the process on this attempt (what reconciliation needs). */
+interface Sent {
+  payer?: string;
+  nonce?: string;
+  signature?: string;
+  quote: Quote;
+}
+
+function sentPayment(payload: PaymentPayload, headers: Record<string, string>, quote: Quote): Sent {
+  const inner = (payload as { payload?: unknown }).payload;
+  const auth = inner && typeof inner === "object" ? (inner as Record<string, unknown>).authorization : undefined;
+  const a = auth && typeof auth === "object" ? (auth as Record<string, unknown>) : {};
+  return {
+    payer: typeof a.from === "string" ? a.from : undefined,
+    nonce: typeof a.nonce === "string" ? a.nonce : undefined,
+    signature: Object.values(headers)[0],
+    quote,
+  };
+}
+
+function errName(e: unknown): string {
+  return e instanceof Error ? `${e.name}: ${e.message}`.slice(0, 200) : String(e).slice(0, 200);
+}
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 function envKey(): string | undefined {
@@ -210,6 +397,8 @@ function envKey(): string | undefined {
 
 class Quote implements QuoteDetails {
   paymentRequired?: PaymentRequired;
+  /** The one requirement this client would pay (the first Base entry). */
+  requirement?: PaymentRequirements;
   priceUsd?: number;
   amountAtomic?: string;
   asset?: string;
@@ -229,6 +418,7 @@ class Quote implements QuoteDetails {
     }
     const accepts = this.paymentRequired?.accepts ?? [];
     const req = accepts.find((a) => a.network === BASE_MAINNET) ?? accepts[0];
+    this.requirement = req;
     this.amountAtomic = req?.amount;
     this.priceUsd = atomicToUsd(req?.amount);
     this.asset = req?.asset;
@@ -260,6 +450,8 @@ class Quote implements QuoteDetails {
 export class Tanod {
   readonly baseUrl: string;
   readonly maxPriceUsd: number | null;
+  /** Total USD this client may sign (default 5); null = no total cap. */
+  readonly maxSpendUsd: number | null;
   readonly maxRetries: number;
   readonly maxRetryWaitSeconds: number;
   readonly useFreeTier: boolean;
@@ -267,10 +459,16 @@ export class Tanod {
   #payer?: x402Client;
   readonly #http: x402HTTPClient;
   readonly #fetch: typeof globalThis.fetch;
+  readonly #payees: PayeeTable | null;
+  readonly #budgetAtomic: bigint | null;
+  #spentAtomic = 0n;
 
   constructor(opts: TanodOptions = {}) {
     this.baseUrl = (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
     this.maxPriceUsd = opts.maxPriceUsd === undefined ? DEFAULT_MAX_PRICE_USD : opts.maxPriceUsd;
+    this.#payees = payeeTable(opts.payees);
+    this.maxSpendUsd = opts.maxSpendUsd === undefined ? DEFAULT_MAX_SPEND_USD : opts.maxSpendUsd;
+    this.#budgetAtomic = this.maxSpendUsd === null ? null : usdToAtomic(this.maxSpendUsd, "maxSpendUsd");
     this.maxRetries = Math.max(0, opts.maxRetries ?? 2);
     this.maxRetryWaitSeconds = opts.maxRetryWaitSeconds ?? 30;
     this.useFreeTier = opts.useFreeTier ?? true;
@@ -303,6 +501,15 @@ export class Tanod {
   /** True when a payment signer is configured. */
   get hasWallet(): boolean {
     return this.#payer !== undefined;
+  }
+
+  /**
+   * USD committed by this client so far: the sum of the payments it has signed. It counts a
+   * payment as spent once signed, even if the request then failed (it may still settle), so it is
+   * an upper bound on what was charged.
+   */
+  get spentUsd(): number {
+    return Number(this.#spentAtomic) / 10 ** USDC_DECIMALS;
   }
 
   toString(): string {
@@ -352,6 +559,15 @@ export class Tanod {
         body: q.body,
       });
     }
+    // Payee pinning: never pay an address that is not on the allow-list (by default Tanod's own),
+    // so a wrong or hijacked baseUrl cannot redirect payments.
+    if (this.#payees && !payeeAllowed(this.#payees, q.network, q.payTo)) {
+      throw new PayeeMismatchError(
+        `${path} asks for payment to ${q.payTo} on ${q.network}, which is not an allowed payee; nothing was signed. ` +
+          "Check baseUrl, or pass payees to allow another deployment's payee",
+        q.details(),
+      );
+    }
     if (!this.#payer) {
       throw new PaymentRequiredError(
         `${path} costs USD ${q.priceUsd} (free daily tier used up or not available). ` +
@@ -364,6 +580,34 @@ export class Tanod {
         `${path} quotes USD ${q.priceUsd}, above maxPriceUsd=${this.maxPriceUsd}; nothing was signed`,
         q.details(),
       );
+    }
+  }
+
+  /** Reserve the quoted amount against maxSpendUsd before signing; returns the atomic amount reserved. */
+  #reserve(q: Quote, path: string): bigint {
+    const amount = BigInt(q.amountAtomic!);
+    if (this.#budgetAtomic !== null && this.#spentAtomic + amount > this.#budgetAtomic) {
+      throw new BudgetExceededError(
+        `${path} quotes USD ${q.priceUsd}, but this client has already signed USD ${this.spentUsd} ` +
+          `of its maxSpendUsd=${this.maxSpendUsd}; nothing was signed`,
+        { ...q.details(), spentUsd: this.spentUsd, maxSpendUsd: this.maxSpendUsd! },
+      );
+    }
+    this.#spentAtomic += amount;
+    return amount;
+  }
+
+  /** The signed payload must be for exactly the vetted requirement (guards custom payment clients). */
+  #checkSigned(payload: PaymentPayload, req: PaymentRequirements, q: Quote, path: string): void {
+    const a = (payload as { accepted?: Partial<PaymentRequirements> }).accepted;
+    if (this.#payees && !payeeAllowed(this.#payees, a?.network, a?.payTo)) {
+      throw new PayeeMismatchError(
+        `${path}: the payment client signed a payment to ${a?.payTo} on ${a?.network}, which is not an allowed payee; nothing was sent`,
+        { ...q.details(), payTo: a?.payTo, network: a?.network },
+      );
+    }
+    if (!a || a.network !== req.network || a.payTo !== req.payTo || a.asset !== req.asset || a.amount !== req.amount) {
+      throw new PaymentError(`${path}: the signed payment does not match the vetted quote; nothing was sent`);
     }
   }
 
@@ -391,29 +635,58 @@ export class Tanod {
       // The free-tier opt-in goes on the unpaid attempt only, never on the paid retry.
       let res = await this.#send(route, this.useFreeTier ? { [FREE_TIER_HEADER]: "1" } : undefined);
       let quote: Quote | undefined;
+      let sent: Sent | undefined;
       if (res.status === 402) {
         quote = new Quote(this.#http, res, (await readBody(res)).json);
         this.#checkQuote(quote, route.path);
+        const req = quote.requirement!;
+        const reserved = this.#reserve(quote, route.path);
         let payHeaders: Record<string, string>;
+        let payload: PaymentPayload;
         try {
-          const payload = await this.#http.createPaymentPayload(quote.paymentRequired!);
+          // The x402 client sees only the vetted requirement, so it cannot pick another entry.
+          payload = await this.#http.createPaymentPayload({ ...quote.paymentRequired!, accepts: [req] });
+          this.#checkSigned(payload, req, quote, route.path);
           payHeaders = this.#http.encodePaymentSignatureHeader(payload);
         } catch (e) {
+          // Nothing left the process, so the reservation is released. After the send below it never
+          // is: the payment may settle even if the request then fails.
+          this.#spentAtomic -= reserved;
+          if (e instanceof TanodError) throw e;
           throw new PaymentError(`could not build the x402 payment: ${(e as Error).message}`);
         }
-        res = await this.#send(route, payHeaders);
+        sent = sentPayment(payload, payHeaders, quote);
+        try {
+          res = await this.#send(route, payHeaders);
+        } catch (e) {
+          // Sent, no answer (timeout, dropped connection): never retried, never paid again.
+          throw this.#unresolved(PaymentUnresolvedError, route.path, `no answer after the payment was sent (${errName(e)}); it may have settled`, sent, { cause: e });
+        }
         if (res.status === 402) {
           const again = new Quote(this.#http, res, (await readBody(res)).json);
           throw new PaymentRequiredError(`${route.path}: payment refused: ${again.reason ?? "no reason given"}`, again.details());
         }
       }
+      const { json, text, error } = await readBody(res);
+      if (error !== undefined) {
+        if (sent) {
+          // Keep the receipt; charged only when it decodes as a successful settlement, otherwise unknown.
+          throw this.#unresolved(
+            PaymentUnresolvedError,
+            route.path,
+            `no answer after the payment was sent (HTTP ${res.status}, body read failed: ${errName(error)}); it may have settled`,
+            sent,
+            { cause: error, res, chargedByReceipt: true, withReceipt: true },
+          );
+        }
+        throw new TanodError(`${route.path}: could not read the answer (HTTP ${res.status}): ${errName(error)}`, { status: res.status });
+      }
+      this.#throwIfUnresolved(res, json, text, route.path, sent); // before any retry: never a second payment
       const wait = this.#waitFor(res, attempt);
       if (wait !== undefined) {
-        await res.body?.cancel().catch(() => undefined);
         await sleep(wait * 1000);
         continue;
       }
-      const { json, text } = await readBody(res);
       if (res.status >= 400) this.#throwFor(res, json, text, route.path);
       const meta: T.ResponseMeta = {
         status: res.status,
@@ -429,10 +702,96 @@ export class Tanod {
       let data: object;
       if (route.kind === "text") data = { text };
       else if (json && typeof json === "object") data = json as object;
+      else if (sent)
+        // A paid 2xx: keep its receipt for reconciliation. Charged only with a successful receipt (the
+        // server's free-miss 200 has none and is not charged); otherwise unknown.
+        throw this.#unresolved(PaymentUnresolvedError, route.path, "the payment settled, but the answer could not be read (expected a JSON object)", sent, {
+          res,
+          chargedByReceipt: true,
+          withReceipt: true,
+          body: text.slice(0, 500),
+        });
       else throw new TanodError(`${route.path}: expected a JSON object`, { status: res.status, body: text.slice(0, 500) });
       Object.defineProperty(data, "meta", { value: meta, enumerable: false });
       return data as T.WithMeta<R>;
     }
+  }
+
+  #hasReceipt(res: Response): boolean {
+    return Boolean(res.headers.get("payment-response") || res.headers.get("x-payment-response"));
+  }
+
+  #unresolved(
+    Cls: typeof PaymentUnresolvedError,
+    path: string,
+    what: string,
+    sent: Sent | undefined,
+    o: {
+      res?: Response;
+      withReceipt?: boolean;
+      charged?: boolean;
+      chargedByReceipt?: boolean;
+      code?: string;
+      serverMessage?: string;
+      body?: unknown;
+      settlement?: unknown;
+      cause?: unknown;
+    },
+  ): PaymentUnresolvedError {
+    const q = sent?.quote;
+    const receipt = o.res && o.withReceipt ? this.#receipt(o.res, q) : undefined;
+    const charged = o.chargedByReceipt ? (receipt?.success ? true : undefined) : o.charged;
+    const keep = sent ? `; keep payer ${sent.payer} and authorization nonce ${sent.nonce} for reconciliation` : "";
+    const err = new Cls(`${path}: ${what}. Do not pay again for this request${keep}`, {
+      status: o.res?.status,
+      body: o.body,
+      code: o.code,
+      serverMessage: o.serverMessage,
+      charged,
+      payer: sent?.payer,
+      nonce: sent?.nonce,
+      paymentSignature: sent?.signature,
+      priceUsd: q?.priceUsd,
+      amountAtomic: q?.amountAtomic,
+      receipt,
+      settlement: o.settlement,
+    });
+    if (o.cause !== undefined) Object.defineProperty(err, "cause", { value: o.cause, enumerable: false, configurable: true, writable: true });
+    return err;
+  }
+
+  /**
+   * Throw `PaymentUnresolvedError` for an answer that must never be retried or paid again. Always:
+   * `settlement_unknown`, `purchase_unresolved`, `credit_delivery_pending`. After a payment was
+   * sent, also any error answer that carries a settlement receipt (it settled), and any 5xx or 429
+   * whose code is not one the server documents as uncharged (UNCHARGED). Other 4xx answers are
+   * refusals before any settlement and are never retried.
+   */
+  #throwIfUnresolved(res: Response, json: unknown, text: string, path: string, sent?: Sent): void {
+    const s = res.status;
+    if (s < 400) return;
+    const code = errorField(json, "code");
+    const hasReceipt = this.#hasReceipt(res);
+    let Cls: typeof PaymentUnresolvedError | undefined = code !== undefined && Object.hasOwn(UNRESOLVED, code) ? UNRESOLVED[code] : undefined;
+    if (!Cls) {
+      if (!sent || !(hasReceipt || ((s >= 500 || s === 429) && (code === undefined || !UNCHARGED.has(code))))) return;
+      Cls = PaymentUnresolvedError;
+    }
+    const serverMessage = errorField(json, "message") ?? errorField(json, "detail");
+    let what: string;
+    if (Cls !== PaymentUnresolvedError) what = `${code}: ${serverMessage ?? errorText(json, text)}`;
+    else if (hasReceipt) what = `the payment settled, but no result came back (HTTP ${s}: ${errorText(json, text)})`;
+    else if (code !== undefined) what = `HTTP ${s} ${code} after the payment was sent, not a code the server documents as uncharged; it may have settled`;
+    else what = `no readable answer (HTTP ${s}) after the payment was sent; it may have settled`;
+    throw this.#unresolved(Cls, path, what, sent, {
+      res,
+      withReceipt: hasReceipt,
+      body: json ?? text,
+      code,
+      serverMessage,
+      charged: hasReceipt ? true : code !== undefined && Object.hasOwn(UNRESOLVED_CHARGED, code) ? UNRESOLVED_CHARGED[code] : undefined,
+      settlement: json && typeof json === "object" ? (json as Record<string, unknown>).settlement : undefined,
+    });
   }
 
   #throwFor(res: Response, json: unknown, text: string, path: string): never {
@@ -545,7 +904,7 @@ export class Tanod {
     return this.#call({ method: "POST", path: "/v1/meta", body: { url } });
   }
 
-  /** sitepeek: OCR of a public image (PNG, JPEG, WebP, GIF, single-page TIFF; <= 10 MB). `lang` is a tesseract code (installed: eng). USD 0.0025; shares the 5 free/IP/day. */
+  /** sitepeek: OCR of a public image (PNG, JPEG, WebP, GIF, single-page TIFF; <= 10 MB). `lang` is a tesseract code (installed: eng). USD 0.01; shares the 5 free/IP/day. */
   async ocrImage(url: string, lang?: string): Promise<T.WithMeta<T.OcrResult>> {
     return this.#call({ method: "POST", path: "/v1/ocr", body: compact({ url, lang }) });
   }
@@ -684,7 +1043,7 @@ export class Tanod {
 
   // -- findpeek / weatherpeek ----------------------------------------------------
 
-  /** findpeek: web search over an independent index (title, url, snippet). USD 0.007; 3 free/IP/day. Results are untrusted web content. */
+  /** findpeek: web search over an independent index (title, url, snippet). USD 0.012; 3 free/IP/day. Results are untrusted web content. */
   async webSearch(
     query: string,
     opts: { count?: number; country?: string; freshness?: T.Freshness } = {},

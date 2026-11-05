@@ -49,7 +49,7 @@ path = "src/tanod/_version.py"
 packages = ["src/tanod"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/tanod", "tests", "README.md", "LICENSE", "pyproject.toml"]
+include = ["src/tanod", "tests", "README.md", "CHANGELOG.md", "LICENSE", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

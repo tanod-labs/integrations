@@ -223,7 +223,7 @@ describe("paid flow", () => {
     const { client, calls } = make(
       (req, n) => {
         if (!req.headers.has("payment-signature")) return r402("1000");
-        if (n === 2) return json(503, { error: { code: "facilitator_unavailable" } }, { "Retry-After": "0" });
+        if (n === 2) return json(503, { error: { code: "facilitator_error" } }, { "Retry-After": "0" });
         return json(200, GAS, { "PAYMENT-RESPONSE": settle() });
       },
       { signer: throwaway() },

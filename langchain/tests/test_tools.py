@@ -89,6 +89,8 @@ def test_check_address_tool_output():
         ("tanod_get_contract_source", {"address": A, "chain": "base"}, f"/v1/source/base/{A}", None),
         ("tanod_scan_package", {"source": "npm:left-pad@1.3.0"}, "/v1/scan/package", {"source": "npm:left-pad@1.3.0"}),
         ("tanod_render_url", {"url": "https://example.com"}, "/v1/render", {"url": "https://example.com", "format": "markdown"}),
+        ("tanod_screenshot", {"url": "https://example.com"}, "/v1/web/screenshot", {"url": "https://example.com", "format": "jpeg"}),
+        ("tanod_document_to_markdown", {"url": "https://x.example/a.docx"}, "/v1/docs/to-markdown", {"url": "https://x.example/a.docx"}),
         ("tanod_inspect_domain", {"domain": "example.com", "checks": ["tls"]}, "/v1/domain/inspect", {"domain": "example.com", "checks": ["tls"]}),
         ("tanod_resolve_ens", {"name": "vitalik.eth"}, "/v1/chain/ens", {"name": "vitalik.eth"}),
         ("tanod_decode_calldata", {"calldata": "0xa9059cbb"}, "/v1/chain/calldata", {"calldata": "0xa9059cbb"}),
@@ -209,11 +211,20 @@ def test_toolkit():
     assert [t.name for t in TanodToolkit(client=c, include=["tanod_scan_package"]).get_tools()] == ["tanod_scan_package"]
 
 
+def test_agent_useful_tools_are_default():
+    must = [
+        "tanod_web_search", "tanod_render_url", "tanod_screenshot", "tanod_extract_pdf", "tanod_document_to_markdown",
+        "tanod_ocr_image", "tanod_inspect_domain", "tanod_verify_email", "tanod_check_url", "tanod_check_address",
+        "tanod_scan_contract_address", "tanod_scan_package", "tanod_balance", "tanod_get_token_price",
+    ]
+    assert all(n in DEFAULT_TOOL_NAMES for n in must)
+
+
 def test_new_tools_are_opt_in_and_validated():
     new = [
-        "tanod_extract_pdf", "tanod_get_page_meta", "tanod_ocr_image", "tanod_rdap_lookup", "tanod_verify_email",
-        "tanod_ip_lookup", "tanod_get_token_price", "tanod_get_transaction", "tanod_get_nft", "tanod_get_allowance",
-        "tanod_get_portfolio", "tanod_get_swap_quote", "tanod_web_search", "tanod_get_weather",
+        "tanod_get_page_meta", "tanod_rdap_lookup",
+        "tanod_ip_lookup", "tanod_get_transaction", "tanod_get_nft", "tanod_get_allowance",
+        "tanod_get_portfolio", "tanod_get_swap_quote", "tanod_get_weather",
     ]
     assert all(n in TOOL_NAMES and n not in DEFAULT_TOOL_NAMES for n in new)
     c, seen = client_with(lambda r: httpx.Response(200, json={}))
@@ -232,13 +243,65 @@ def test_skypeek_mlpeek_screening_tools_are_opt_in_and_validated():
         "tanod_get_metar", "tanod_get_taf", "tanod_decode_metar_taf", "tanod_lookup_airport", "tanod_airport_distance",
         "tanod_get_space_weather", "tanod_aurora_forecast", "tanod_asteroid_close_approaches", "tanod_sun_moon_times",
         "tanod_satellite_passes", "tanod_embed_texts", "tanod_rerank_documents", "tanod_text_similarity",
-        "tanod_extract_entities", "tanod_classify_zero_shot", "tanod_check_url", "tanod_check_urls",
+        "tanod_extract_entities", "tanod_classify_zero_shot", "tanod_check_urls", "tanod_check_url",
         "tanod_check_sanctions_batch",
     ]
-    assert all(n in TOOL_NAMES and n not in DEFAULT_TOOL_NAMES for n in new)
+    assert all(n in TOOL_NAMES for n in new)
     c, seen = client_with(lambda r: httpx.Response(200, json={}))
     tools = tools_by_name(c, include=new)
     assert tools["tanod_text_similarity"].invoke({"a": "only a"}).startswith("Invalid input")
     assert tools["tanod_check_url"].invoke({}).startswith("Invalid input")
     assert tools["tanod_lookup_airport"].invoke({}).startswith("Invalid input")
     assert seen == []
+
+
+def _paid_then(answer):
+    def h(req):
+        if "PAYMENT-SIGNATURE" not in req.headers:
+            return httpx.Response(402, json=pr("1000"), headers={"PAYMENT-REQUIRED": b64(pr("1000"))})
+        return answer(req)
+    return h
+
+
+def _timeout(req):
+    raise httpx.ReadTimeout("timed out", request=req)
+
+
+UNRESOLVED_CASES = [
+    (lambda req: httpx.Response(503, json={"error": {"code": "settlement_unknown", "message": "m"}}), "settlement_unknown", "charge unknown"),
+    (lambda req: httpx.Response(409, json={"error": {"code": "purchase_unresolved", "message": "m"}}), "purchase_unresolved", "this payment not charged"),
+    (lambda req: httpx.Response(503, json={"error": {"code": "credit_delivery_pending", "message": "m"}}), "credit_delivery_pending", "charged"),
+    (_timeout, "none", "charge unknown"),
+]
+
+
+def _signed_nonce(seen):
+    paid = [r for r in seen if "PAYMENT-SIGNATURE" in r.headers]
+    assert len(paid) == 1                                   # never paid twice
+    return json.loads(base64.b64decode(paid[0].headers["PAYMENT-SIGNATURE"]))["payload"]["authorization"]
+
+
+@pytest.mark.parametrize("answer,code,charged", UNRESOLVED_CASES)
+def test_payment_unresolved_tool_text(answer, code, charged):
+    c, seen = client_with(_paid_then(answer), signer=Account.create())
+    out = tools_by_name(c)["tanod_gas_price"].invoke({"chain": "base"})
+    auth = _signed_nonce(seen)
+    assert out.startswith(f"Payment sent, outcome unresolved (code {code}, {charged}): do NOT retry")
+    assert auth["nonce"] in out and auth["from"] in out
+    assert len(seen) == 2
+
+
+@pytest.mark.parametrize("answer,code,charged", UNRESOLVED_CASES)
+def test_async_payment_unresolved_tool_text(answer, code, charged):
+    seen = []
+
+    def h(req):
+        seen.append(req)
+        return _paid_then(answer)(req)
+
+    ac = AsyncTanod(use_env=False, signer=Account.create(), http_client=httpx.AsyncClient(transport=httpx.MockTransport(h)))
+    tool = {t.name: t for t in get_tanod_tools(async_client=ac, include=["tanod_gas_price"])}["tanod_gas_price"]
+    out = asyncio.run(tool.ainvoke({"chain": "base"}))
+    auth = _signed_nonce(seen)
+    assert out.startswith(f"Payment sent, outcome unresolved (code {code}, {charged}): do NOT retry")
+    assert auth["nonce"] in out

@@ -7,15 +7,36 @@ stored as strings, logged, or included in reprs or errors.
 from __future__ import annotations
 
 import os
-from decimal import Decimal
-from typing import Any, Callable, Optional
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from types import MappingProxyType
+from typing import Any, Callable, Mapping, Optional, Sequence, Union
 
-from ._errors import PaymentError, WalletNotConfiguredError
+from ._errors import InvalidRequestError, PaymentError, WalletNotConfiguredError
 from ._models import PaymentReceipt
 
 BASE_MAINNET = "eip155:8453"
 USDC_DECIMALS = 6
 ENV_PRIVATE_KEY = "TANOD_PRIVATE_KEY"
+
+# Tanod's own payees (x402 ``payTo``) per CAIP-2 network: the default allow-list for ``payees``.
+# Source: the ``accepts`` list of an unpaid POST https://tanod.dev/v1/check/address
+# (PAYMENT-REQUIRED header and JSON body agree), read 2026-10-15. EVM networks share one address.
+TANOD_PAYEES: Mapping[str, str] = MappingProxyType(
+    {
+        "eip155:8453": "0x593857A4a4F619543ea12394137C3004ce841720",  # Base
+        "eip155:137": "0x593857A4a4F619543ea12394137C3004ce841720",  # Polygon
+        "eip155:56": "0x593857A4a4F619543ea12394137C3004ce841720",  # BNB Chain
+        "eip155:42161": "0x593857A4a4F619543ea12394137C3004ce841720",  # Arbitrum One
+        "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp": "RMk9k3VC8dr4hhjgFh88rGhjAbzfBzHxJJ5n2fTcqus",  # Solana mainnet
+    }
+)
+
+#: Allow-list of payees: per CAIP-2 network (``{"eip155:8453": "0x..."}``), or a flat list that
+#: applies to every network. EVM addresses compare case-insensitively, others exactly.
+Payees = Union[Mapping[str, Union[str, Sequence[str]]], Sequence[str]]
+
+# network (CAIP-2) or "*" (a flat list: any network) -> allowed payees
+PayeeTable = Mapping[str, tuple[str, ...]]
 
 _INSTALL_HINT = 'Payments need the wallet extra: pip install "tanod[wallet]"'
 
@@ -27,6 +48,58 @@ def atomic_to_usd(amount: Optional[str]) -> Optional[Decimal]:
         return Decimal(int(amount)) / (Decimal(10) ** USDC_DECIMALS)
     except (TypeError, ValueError):
         return None
+
+
+def usd_to_atomic(usd: Any, what: str) -> int:
+    """A non-negative USD amount in USDC atomic units (6 decimals)."""
+    try:
+        if isinstance(usd, bool):
+            raise TypeError
+        value = Decimal(str(usd))
+        if not value.is_finite() or value < 0:
+            raise ValueError
+    except (TypeError, ValueError, InvalidOperation):
+        raise InvalidRequestError(f"{what} must be a non-negative number of USD, or None") from None
+    return int((value * (Decimal(10) ** USDC_DECIMALS)).to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def payee_table(payees: Any) -> Optional[PayeeTable]:
+    """Normalize ``payees`` (``None`` disables pinning); raise on an empty or malformed list."""
+    if payees is None:
+        return None
+
+    def as_tuple(value: Any, where: str) -> tuple[str, ...]:
+        if isinstance(value, str):
+            items: Any = [value]
+        elif isinstance(value, (list, tuple, set, frozenset)):
+            items = list(value)
+        else:
+            items = None
+        if not items or not all(isinstance(a, str) and a.strip() for a in items):
+            raise InvalidRequestError(
+                f"payees{where} must be an address or a non-empty list of addresses (None disables pinning)"
+            )
+        return tuple(a.strip() for a in items)
+
+    if isinstance(payees, Mapping):
+        table = {str(net): as_tuple(v, f"[{net!r}]") for net, v in payees.items()}
+    else:
+        table = {"*": as_tuple(payees, "")}
+    if not table:
+        raise InvalidRequestError("payees must name at least one payee (None disables pinning)")
+    return MappingProxyType(table)
+
+
+def payee_allowed(table: PayeeTable, network: Any, pay_to: Any) -> bool:
+    if not isinstance(network, str) or not isinstance(pay_to, str):
+        return False
+    allowed = table.get(network) or table.get("*")
+    if not allowed:
+        return False
+    if network.startswith("eip155:"):
+        lowered = pay_to.lower()
+        return any(a.lower() == lowered for a in allowed)
+    return pay_to in allowed
 
 
 def build_payment_client(

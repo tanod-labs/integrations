@@ -148,6 +148,28 @@ def render(
     return Route("POST", "/v1/render", m.RenderResult, body)
 
 
+def screenshot(
+    url: str, width: Optional[int], height: Optional[int], full_page: bool, format: str, quality: Optional[int]
+) -> Route:
+    if format not in ("png", "jpeg"):
+        raise InvalidRequestError("format must be 'png' or 'jpeg'")
+    body = _drop_none(
+        {"url": url, "width": width, "height": height, "full_page": full_page or None,
+         "format": None if format == "png" else format, "quality": quality}
+    )
+    return Route("POST", "/v1/web/screenshot", m.ScreenshotResult, body)
+
+
+def docs_to_markdown(url: Optional[str], content: Optional[bytes], filename: Optional[str]) -> Route:
+    if (url is None) == (content is None):
+        raise InvalidRequestError("give exactly one of url or content")
+    if content is not None:
+        body = _drop_none({"file_base64": base64.b64encode(content).decode("ascii"), "filename": filename})
+    else:
+        body = _drop_none({"url": url, "filename": filename})
+    return Route("POST", "/v1/docs/to-markdown", m.DocumentMarkdown, body)
+
+
 def inspect_domain(domain: str, checks: Optional[Sequence[str]]) -> Route:
     if checks is not None:
         checks = list(checks)

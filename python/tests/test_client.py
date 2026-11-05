@@ -193,7 +193,7 @@ def test_paid_503_restarts_flow_with_fresh_payment(throwaway_account):
         if "PAYMENT-SIGNATURE" not in req.headers:
             return response_402("1000")
         if n == 2:
-            return httpx.Response(503, json={"error": {"code": "facilitator_unavailable"}}, headers={"Retry-After": "0"})
+            return httpx.Response(503, json={"error": {"code": "facilitator_error"}}, headers={"Retry-After": "0"})
         return httpx.Response(200, json=GAS, headers={"PAYMENT-RESPONSE": settle_header()})
 
     client, api = make(h, signer=throwaway_account)
@@ -267,6 +267,9 @@ ROUTES = [
     (lambda c: c.extract_pdf("https://example.com/a.pdf", max_pages=5), "POST", "/v1/pdf", {"url": "https://example.com/a.pdf", "max_pages": 5}),
     (lambda c: c.page_meta("https://example.com"), "POST", "/v1/meta", {"url": "https://example.com"}),
     (lambda c: c.ocr_image("https://example.com/a.png", lang="eng"), "POST", "/v1/ocr", {"url": "https://example.com/a.png", "lang": "eng"}),
+    (lambda c: c.screenshot("https://example.com", width=800, format="jpeg", quality=60), "POST", "/v1/web/screenshot", {"url": "https://example.com", "width": 800, "format": "jpeg", "quality": 60}),
+    (lambda c: c.docs_to_markdown("https://example.com/a.docx"), "POST", "/v1/docs/to-markdown", {"url": "https://example.com/a.docx"}),
+    (lambda c: c.docs_to_markdown(content=b"hi", filename="a.txt"), "POST", "/v1/docs/to-markdown", {"file_base64": "aGk=", "filename": "a.txt"}),
     (lambda c: c.rdap_lookup("example.com"), "POST", "/v1/rdap", {"query": "example.com"}),
     (lambda c: c.verify_email("a@example.com"), "POST", "/v1/email/verify", {"email": "a@example.com"}),
     (lambda c: c.ip_lookup("1.1.1.1"), "POST", "/v1/ip", {"ip": "1.1.1.1"}),

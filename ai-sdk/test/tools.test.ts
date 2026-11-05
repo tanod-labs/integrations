@@ -179,3 +179,48 @@ describe("generateText integration (mock model, mock API)", () => {
     expect(f.calls[0]!.url).toBe("https://tanod.dev/v1/chain/gas");
   });
 });
+
+describe("payments that must be reconciled", () => {
+  const signer = () => privateKeyToAccount(generatePrivateKey()); // random, unfunded
+  const paidThen = (answer: () => Response) =>
+    fake((_url, init) => (new Headers(init?.headers).has("payment-signature") ? answer() : json(402, pr("1000"), { "PAYMENT-REQUIRED": b64(pr("1000")) })));
+
+  for (const [status, code, charged] of [
+    [503, "settlement_unknown", null],
+    [409, "purchase_unresolved", false],
+    [503, "credit_delivery_pending", true],
+    [503, "brand_new_code", null],
+  ] as const) {
+    it(`paid ${status} ${code} -> payment_unresolved (charged ${charged}), never paid twice`, async () => {
+      const f = paidThen(() => json(status, { error: { code, message: "m" } }, { "Retry-After": "0" }));
+      const tools = tanodTools({ signer: signer(), useEnv: false, fetch: f.fetch });
+      const out = (await tools.tanod_gas_price!.execute!({ chain: "base" }, opts)) as TanodToolResult;
+      expect(out).toMatchObject({ ok: false, error: "payment_unresolved", charged, code });
+      if (out.ok || out.error !== "payment_unresolved") throw new Error("unreachable");
+      const auth = JSON.parse(Buffer.from(f.calls[1]!.headers.get("payment-signature")!, "base64").toString()).payload.authorization;
+      expect(out.nonce).toBe(auth.nonce);
+      expect(out.payer).toBe(auth.from);
+      expect(out.message).toMatch(/do NOT retry or pay again/);
+      expect(f.calls.filter((c) => c.headers.has("payment-signature"))).toHaveLength(1);
+    });
+  }
+
+  it("no answer after paying -> payment_unresolved, charged null", async () => {
+    const f = paidThen(() => {
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    });
+    const tools = tanodTools({ signer: signer(), useEnv: false, fetch: f.fetch });
+    const out = (await tools.tanod_gas_price!.execute!({ chain: "base" }, opts)) as TanodToolResult;
+    expect(out).toMatchObject({ ok: false, error: "payment_unresolved", charged: null, code: null });
+    expect(f.calls).toHaveLength(2);
+  });
+
+  it("uncharged 503 -> unavailable, charged false; unexpected error -> charged null", async () => {
+    const busy = fake(() => json(503, { error: { code: "busy" } }, { "Retry-After": "0" }));
+    const t1 = tanodTools({ useEnv: false, fetch: busy.fetch, maxRetries: 0 });
+    expect(await t1.tanod_gas_price!.execute!({ chain: "base" }, opts)).toMatchObject({ ok: false, error: "unavailable", charged: false });
+    const odd = fake(() => json(418, { error: { code: "teapot" } }));
+    const t2 = tanodTools({ useEnv: false, fetch: odd.fetch });
+    expect(await t2.tanod_gas_price!.execute!({ chain: "base" }, opts)).toMatchObject({ ok: false, error: "error", charged: null });
+  });
+});
