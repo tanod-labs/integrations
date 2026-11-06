@@ -374,7 +374,12 @@ def test_async_cancel_after_paying_is_reraised_with_payer_and_nonce(throwaway_ac
         asyncio.run(main())
     assert type(seen[0]) is asyncio.CancelledError   # the caller's own cancellation, not a PaymentUnresolvedError
     assert_noted(seen[0], api, caplog)
-    assert ei.value is seen[0] or ei.value.__context__ is seen[0]
+    # Python 3.10 wraps CancelledError at each Task boundary; the original
+    # exception re-raised by the SDK remains in the cancellation context chain.
+    cancelled = ei.value
+    while cancelled is not seen[0] and isinstance(cancelled, asyncio.CancelledError):
+        cancelled = cancelled.__context__
+    assert cancelled is seen[0]
 
 
 def test_async_wait_for_timeout_after_paying_keeps_payer_and_nonce(throwaway_account, caplog):
