@@ -1,6 +1,6 @@
 {
   "name": "@tanod-labs/ai-sdk",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Vercel AI SDK tools for Tanod: address risk checks, smart-contract scans, MCP/skill package scans, web/DNS/chain reads for AI agents. Pay per call with x402 (USDC on Base); free daily tier, no signup.",
   "license": "MIT",
   "author": "Tanod <ops@tanod.dev>",

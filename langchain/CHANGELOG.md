@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.4.0 (unreleased)
+## 0.4.1
+
+- Docs: shorter README and module notes.
+
+## 0.4.0
 
 - Requires `tanod>=0.4.1,<0.5`.
 - `PaymentUnresolvedError` (a payment sent, outcome unresolved) is reported as

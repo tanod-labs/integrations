@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.3.0 (unreleased)
+## 0.3.1
+
+- Docs: shorter README and module notes.
+
+## 0.3.0
 
 - Requires `@tanod-labs/sdk` ^0.3.1.
 - A payment whose outcome is unresolved (`PaymentUnresolvedError`) returns

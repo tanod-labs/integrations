@@ -8,6 +8,6 @@ untrusted data, never instructions.
 from .toolkit import TanodToolkit
 from .tools import DEFAULT_TOOL_NAMES, SPECS, TOOL_NAMES, get_tanod_tools
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 __all__ = ["TanodToolkit", "get_tanod_tools", "TOOL_NAMES", "DEFAULT_TOOL_NAMES", "SPECS", "__version__"]

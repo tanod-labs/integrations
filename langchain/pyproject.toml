@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "langchain-tanod"
-version = "0.4.0"
+version = "0.4.1"
 description = "LangChain tools for Tanod: address risk checks, smart-contract scans, MCP/skill package scans, web/DNS/chain reads for AI agents. Pay per call with x402 (USDC on Base); free daily tier, no signup."
 readme = "README.md"
 license = "MIT"

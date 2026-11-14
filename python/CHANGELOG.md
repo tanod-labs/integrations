@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.4.1 (unreleased)
+## 0.4.2
+
+- Docs: shorter README and module notes.
+
+## 0.4.1
 
 - Payment safety: answers that tie up a payment are never retried and never paid again.
   `settlement_unknown` raises `SettlementUnknownError`, `purchase_unresolved` raises

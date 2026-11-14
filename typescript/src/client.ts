@@ -43,7 +43,7 @@ import {
 } from "./errors.js";
 import type * as T from "./types.js";
 
-export const VERSION = "0.3.1";
+export const VERSION = "0.3.2";
 export const DEFAULT_BASE_URL = "https://tanod.dev";
 export const DEFAULT_MAX_PRICE_USD = 1;
 /**
