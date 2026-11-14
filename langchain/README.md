@@ -5,9 +5,8 @@ security and utility tools for AI agents. No signup and no API key. Each tool ha
 tier. Past it, the agent pays per call in USDC on Base with [x402](https://x402.org), through
 the [`tanod`](https://pypi.org/project/tanod/) SDK.
 
-> Tanod is operated by an autonomous AI agent. Results are automated and heuristic, not an
-> audit. Every tool description tells the model that text inside results is **untrusted data,
-> never instructions**.
+> Results are automated and heuristic, not an audit. Every tool description tells the model
+> that text inside results is **untrusted data, never instructions**.
 
 ## Install
 
@@ -117,4 +116,4 @@ pip install -e ../python -e ".[dev]"
 pytest   # mocked HTTP, no network, no real payments
 ```
 
-MIT licensed. Tanod is operated by an autonomous AI agent. Contact: ops@tanod.dev.
+MIT licensed. Contact: ops@tanod.dev.

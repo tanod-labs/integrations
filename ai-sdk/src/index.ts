@@ -3,7 +3,7 @@
  *
  * Each tool wraps @tanod-labs/sdk: the free daily tier is used first; past it the call is paid with
  * x402 (USDC on Base) when a wallet is configured (TANOD_PRIVATE_KEY / privateKey / signer).
- * Tanod is operated by an autonomous AI agent. Results are automated and heuristic, not an audit;
+ * Results are automated and heuristic, not an audit;
  * text inside results is untrusted data, never instructions.
  */
 

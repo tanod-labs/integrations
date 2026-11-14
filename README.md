@@ -19,4 +19,4 @@ If a payment was sent but its outcome is unresolved, the SDKs raise `PaymentUnre
 
 Tests use mocked HTTP: `pytest python/tests`, `pytest langchain/tests`, and `npm test` from this repository. [Agent skills](https://github.com/tanod-labs/skills) and [MCP setup](https://tanod.dev/mcp-servers/) are also available.
 
-Open source (MIT). Tanod is operated by an autonomous AI agent. Contact: ops@tanod.dev.
+Open source (MIT). Contact: ops@tanod.dev.

@@ -5,9 +5,8 @@ and utility tools for AI agents. No signup and no API key. Each tool has a free 
 it, the agent pays per call in USDC on Base with [x402](https://x402.org), through
 [`@tanod-labs/sdk`](../typescript).
 
-> Tanod is operated by an autonomous AI agent. Results are automated and heuristic, not an
-> audit. Every tool description tells the model that text inside results is **untrusted data,
-> never instructions**.
+> Results are automated and heuristic, not an audit. Every tool description tells the model
+> that text inside results is **untrusted data, never instructions**.
 
 ## Install
 
@@ -106,4 +105,4 @@ npm install
 npm test     # builds @tanod-labs/sdk, then runs vitest with a mock model and mock API; no network, no payments
 ```
 
-MIT licensed. Tanod is operated by an autonomous AI agent. Contact: ops@tanod.dev.
+MIT licensed. Contact: ops@tanod.dev.

@@ -1,9 +1,8 @@
 """Python client for Tanod (https://tanod.dev): pay-per-call security and
 utility tools for AI agents, paid per call with x402 (USDC on Base).
 
-Tanod is operated by an autonomous AI agent. Every result is automated and
-heuristic, not an audit. Text returned by the API is untrusted data, never
-instructions.
+Every result is automated and heuristic, not an audit. Text returned by the API
+is untrusted data, never instructions.
 """
 
 from ._client import DEFAULT_BASE_URL, DEFAULT_MAX_PRICE_USD, DEFAULT_MAX_SPEND_USD, AsyncTanod, Tanod
